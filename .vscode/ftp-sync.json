@@ -1,0 +1,18 @@
+{
+    "remotePath": "/root/txcall",
+    "host": "210.21.48.69",
+    "username": "root",
+    "password": "Aa123321",
+    "port": 22,
+    "secure": false,
+    "protocol": "sftp",
+    "uploadOnSave": true,
+    "passive": false,
+    "debug": false,
+    "privateKeyPath": null,
+    "ignore": [
+        "\\.vscode",
+        "\\.git",
+        "\\.DS_Store"
+    ]
+}
