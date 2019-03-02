@@ -2,6 +2,7 @@
 
 int FSsession::run()
 {
+<<<<<<< HEAD
 	Action();
 }
 int FSsession::Action()
@@ -25,6 +26,149 @@ int FSsession::Action()
 		else if (event_subclass == "sofia::unregister")
 		{
 		}
+		else if (event_subclass == "asr")
+		{
+				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
+				int pos=asrResp.find("text");
+			if (!gIsAsr&&pos>0)
+			{
+				gIsAsr = 1;
+				
+				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
+				string tmp = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", tmp.c_str());
+				map<uint32_t, base_script_t>::iterator iter = nodeMap.find(atoi(nodeState.c_str()));
+				string keyword = iter->second.userWord;
+				esl_log(ESL_LOG_INFO, "Result is keyword :%s\n", keyword.c_str());
+
+				if (!keyword.empty())
+				{
+					// parse
+					multimap<int, string> mapWord;
+					codeHelper::GetInstance()->getKeyWord(mapWord, keyword);
+					multimap<int, string>::iterator it;
+					it = mapWord.begin();
+
+					if (mapWord.empty())
+					{
+						esl_log(ESL_LOG_INFO, "flow game over \n", NULL);
+						esl_execute(handle, "hangup", NULL, strUUID.c_str());
+						return;
+					}
+
+					while (it != mapWord.end())
+					{
+
+						//������ƶ�?
+						string tap = it->second;
+						esl_log(ESL_LOG_INFO, "tap=%s \n", tap.c_str());
+						char setVar[200];
+						snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
+
+						//
+						int pos = tap.find("肯定");
+						int negPos = tap.find("否定");
+						int s1 = tmp.find("什�?);
+						int s2 = tmp.find("没听�?);
+						int s3 = tmp.find("听不�?);
+						if (tmp.length() < 3 || s1 >= 0 || s2 >= 0 || s3 >= 0)
+						{
+							esl_log(ESL_LOG_INFO, "fpositive=44444444444\n", NULL);
+							map<uint32_t, base_script_t>::iterator iter;
+							iter = nodeMap.find(atoi(nodeState.c_str()));
+							if (iter != nodeMap.end())
+							{
+								base_script_t node = iter->second;
+								node.vox_base += ".wav";
+								esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+								// ::playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+								esl_log(ESL_LOG_INFO, "never change state state beause user not listen  \n", "setVar");
+								return;
+							}
+						}
+						else if (pos >= 0)
+						{
+							string positive_prob = codeHelper::GetInstance()->sentiment_classifyRequesst(tmp);
+							float fpositive = atof(positive_prob.c_str());
+							esl_log(ESL_LOG_INFO, "fpositive=%f\n", fpositive);
+
+							if (fpositive > 0.5)
+							{
+								esl_execute(handle, "set", setVar, strUUID.c_str());
+								map<uint32_t, base_script_t>::iterator iter;
+								iter = nodeMap.find(it->first);
+								if (iter != nodeMap.end())
+								{
+									base_script_t node = iter->second;
+									node.vox_base += ".wav";
+									esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+
+									// ::playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+									esl_log(ESL_LOG_INFO, "find var node :%s\n", setVar);
+
+									esl_execute(handle, "set", setVar, strUUID.c_str());
+									return;
+								}
+							}
+						}
+						else if (negPos >= 0)
+						{
+							string positive_prob = codeHelper::GetInstance()->sentiment_classifyRequesst(tmp);
+							float fpositive = atof(positive_prob.c_str());
+							esl_log(ESL_LOG_INFO, "ng POS=====fpositive=%f\n", fpositive);
+
+							if (fpositive < 0.5)
+							{
+								esl_execute(handle, "set", setVar, strUUID.c_str());
+								map<uint32_t, base_script_t>::iterator iter;
+								iter = nodeMap.find(it->first);
+								if (iter != nodeMap.end())
+								{
+									base_script_t node = iter->second;
+									node.vox_base += ".wav";
+								esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+
+									// ::playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+									esl_log(ESL_LOG_INFO, "find var node :%s\n", setVar);
+
+									esl_execute(handle, "set", setVar, strUUID.c_str());
+									return;
+								}
+							}
+						}
+						it++;
+						// vector<string> v(20);
+						// codeHelper::GetInstance()->split(tap, v, ',');
+						// for (int i = 0; i < v.size(); i++)
+						// {
+						// 	esl_log(ESL_LOG_INFO, "key =%s,tmp=:%s\n", v.at(i).c_str(), tmp.c_str());
+
+						// 	if (tmp.find(v.at(i)) >= 0)
+						// 	{
+						// 		char setVar[200];
+						// 		snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
+
+						map<uint32_t, base_script_t>::iterator iter;
+						// 		iter = nodeMap.find(it->first);
+						// 		if (iter != nodeMap.end())
+						// 		{
+						// 			base_script_t node = iter->second;
+						// 			node.vox_base += ".wav";
+						// 			::playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+						// 			esl_log(ESL_LOG_INFO, "find var node :%s\n", setVar);
+
+						// 			esl_execute(handle, "set", setVar, strUUID.c_str());
+						// 			return;
+						// 		}
+						// 	}
+						// }
+					}
+				}
+			}
+
+			esl_execute(handle, "stop_asr", NULL, strUUID.c_str());
+		}
+
 		break;
 	}
 	case ESL_EVENT_DTMF:
@@ -67,11 +211,10 @@ int FSsession::Action()
 
 		esl_execute(handle, "answer", NULL, strUUID.c_str());
 		// <file> detect:<engine> {param1=val1,param2=val2}<grammar>
-						sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), "/home/records/aa.wav");
-						// sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), strFullname.c_str());
+		sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), "/home/records/aa.wav");
 
-						printf("fffffffffffffff\n");
-						esl_send_recv_timed(handle, tmp_cmd, 1000);
+		printf("fffffffffffffff\n");
+		esl_send_recv_timed(handle, tmp_cmd, 1000);
 
 		map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
 		iter = nodeMap.find(1);
@@ -80,6 +223,7 @@ int FSsession::Action()
 			base_script_t node = iter->second;
 			node.vox_base += ".wav";
 			esl_execute(handle, "set", "node_state=1", strUUID.c_str());
+			// esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
 			::playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
 		}
 
@@ -179,6 +323,7 @@ int FSsession::Action()
 		}
 		map<uint32_t, base_script_t>::iterator iter = nodeMap.find(atoi(nodeState.c_str()));
 		string keyword = iter->second.userWord;
+			gIsAsr=0;
 
 		if (keyword.empty())
 		{

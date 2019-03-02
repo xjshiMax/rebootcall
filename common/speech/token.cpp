@@ -167,3 +167,20 @@ RETURN_CODE parse_positive_prob(const char *json, const char *key, char *value, 
         cJSON_Delete(root);
     return RETURN_OK;
 }
+RETURN_CODE parse_ali_asr(const char *json, const char *key, char *value, int value_size)
+{
+    cJSON *items = NULL;
+
+    cJSON *root = cJSON_Parse(json);
+    if (root == NULL)
+    {
+        printf("%s key not exist\n", key);
+        return RETURN_ERROR;
+    }
+    items = cJSON_GetObjectItem(root, "result");
+    sprintf(value, "%s", cJSON_Print(cJSON_GetObjectItem(items, key)));
+
+    if (root)
+        cJSON_Delete(root);
+    return RETURN_OK;
+}

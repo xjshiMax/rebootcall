@@ -97,5 +97,5 @@ string sentiment_classifyRequesst(const string &text);
   string getXmlInput(const string &xmlStr);
   void getKeyWord(multimap<int, string> &keyWord, const string &word);
   void split(const string &s, vector<string> &sv, const char flag = ' ');
-
+string getAliAsrTxt(const string& json);
 };

@@ -4,7 +4,6 @@
 #include <curl/curl.h>
 #include <memory.h>
 
-#include <locale.h>
 #include "speech/token.h"
 #include "speech/ttscurl.h"
 #include "speech/ttscurl.c"
@@ -335,6 +334,16 @@ string codeHelper::emsCallbackRequest(const string &phone,
     }
     curl_easy_cleanup(pCurl);
     return "OK";
+}
+string codeHelper::getAliAsrTxt(const string &json)
+{
+    char value[1024]={0};
+    char cjson[1024];
+    string tmp=json;
+    strcpy(cjson,tmp.c_str());
+
+    parse_ali_asr(cjson, "text", value, sizeof value);
+    return value;
 }
 
 string codeHelper::mosCallbackRequest(const string &phone,
