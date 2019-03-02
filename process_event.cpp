@@ -79,7 +79,6 @@ void process_event(esl_handle_t *handle,
 	}
 	case ESL_EVENT_CHANNEL_ORIGINATE:
 	{
-
 		//������ʼ
 		string is_callout, a_leg_uuid;
 		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
@@ -101,11 +100,10 @@ void process_event(esl_handle_t *handle,
 
 		esl_execute(handle, "answer", NULL, strUUID.c_str());
 		// <file> detect:<engine> {param1=val1,param2=val2}<grammar>
-						sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), "/home/records/aa.wav");
-						// sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), strFullname.c_str());
+		sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), "/home/records/aa.wav");
+		// sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(), strFullname.c_str());
 
-						printf("fffffffffffffff\n");
-						esl_send_recv_timed(handle, tmp_cmd, 1000);
+		esl_send_recv_timed(handle, tmp_cmd, 1000);
 
 		map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
 		iter = nodeMap.find(1);
@@ -147,7 +145,6 @@ void process_event(esl_handle_t *handle,
 		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
 		{
 			esl_log(ESL_LOG_INFO, "CALL OUT HANGUP_COMPLETE :%s\n", strUUID.c_str());
-			//record
 		}
 		break;
 	}
