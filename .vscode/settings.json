@@ -17,5 +17,8 @@
         "map": "cpp",
         "sstream": "cpp",
         "xtree": "cpp"
-    }
+    },
+    "editor.hover.sticky": false,
+    "editor.mouseWheelZoom": true,
+    "files.encoding": "gb2312"
 }

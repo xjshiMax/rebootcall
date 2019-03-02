@@ -1,45 +1,11 @@
 #include "process_event.h"
-#include <stdio.h>
-#include <cstdlib>
-#include <iconv.h>
-#include <iostream>
 
-void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid)
+int FSsession::run()
 {
-	// string param = playFile + " detect:unimrcp {start-input-timers=true,no-input-timeout=90000,recognition-timeout=90000}hello";
-
-	// esl_execute(handle, "play_and_detect_speech", param.c_str(), uuid.c_str());
-	// esl_execute(handle, "set", "play_and_detect_speech_close_asr=true", uuid.c_str());
-	//  esl_execute(handle, "detect_speech", "stop", uuid.c_str());
-
-	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
-	esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
-	esl_execute(handle, "park", NULL, uuid.c_str());
+	Action();
 }
-
-string nodeState;
-
-void process_event(esl_handle_t *handle,
-				   esl_event_t *event,
-				   const map<uint32_t, base_script_t> &keymap)
+int FSsession::Action()
 {
-	string caller_id, agentId;
-	string destination_number;
-	string a_uuid;
-	char tmp_cmd[1024] = {0};
-	string strUUID;
-	strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
-	caller_id = esl_event_get_header(event, "Caller-Caller-ID-Number") ? esl_event_get_header(event, "Caller-Caller-ID-Number") : "";
-	destination_number = esl_event_get_header(event, "Caller-Destination-Number") ? esl_event_get_header(event, "Caller-Destination-Number") : "";
-
-	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
-
-	if (tmpNodeState.length() > 0)
-	{
-		nodeState = tmpNodeState;
-		esl_log(ESL_LOG_INFO, "node_state= %s\n", nodeState.c_str());
-	}
-
 	string event_subclass, contact, from_user;
 	map<uint32_t, base_script_t> nodeMap = keymap;
 	switch (event->event_id)
@@ -53,7 +19,7 @@ void process_event(esl_handle_t *handle,
 
 		if (event_subclass == "sofia::register")
 		{
-			//ע����Ϣ�����µ����ݿ�͵�ǰ�ķֻ��б���?
+			//ע����Ϣ�����µ����ݿ�͵�ǰ�ķֻ��б���??
 			esl_log(ESL_LOG_INFO, "sofia::register  %s, %d event_subclass=%s, contact=%s, from-user=%s\n", __FILE__, __LINE__, event_subclass.c_str(), contact.c_str(), from_user.c_str());
 		}
 		else if (event_subclass == "sofia::unregister")
@@ -69,7 +35,7 @@ void process_event(esl_handle_t *handle,
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
 		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		const char *eventbody = esl_event_get_body(event);
 		printf("body:\n%s\n", eventbody);
 		esl_log(ESL_LOG_INFO, "dtmf :%s\n", dtmf.c_str());
@@ -129,7 +95,7 @@ void process_event(esl_handle_t *handle,
 	case ESL_EVENT_CHANNEL_HANGUP:
 	{
 		string is_callout;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		string bridged_uuid;
 		string hangup_cause;
 		hangup_cause = esl_event_get_header(event, "variable_sip_term_cause") ? esl_event_get_header(event, "variable_sip_term_cause") : "";
@@ -144,7 +110,7 @@ void process_event(esl_handle_t *handle,
 		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
 		//������ͳ�Ʋ�ɾ����Ӧ�ĺ�����Ϣ
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		{
 			esl_log(ESL_LOG_INFO, "CALL OUT HANGUP_COMPLETE :%s\n", strUUID.c_str());
 			//record
@@ -155,7 +121,7 @@ void process_event(esl_handle_t *handle,
 	case ESL_EVENT_CHANNEL_DESTROY:
 	{
 		//to do�˴�ͳһ����������֪ͨ���������ݿ�ĳ���ֶ��Ƿ�Ӧ��������
-		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		string hangupTime = esl_event_get_header(event, "Caller-Channel-Hangup-Time") ? esl_event_get_header(event, "Caller-Channel-Hangup-Time") : "";
 
 		string recordFileName = esl_event_get_header(event, "variable_record_filename") ? esl_event_get_header(event, "variable_record_filename") : "";
@@ -168,7 +134,7 @@ void process_event(esl_handle_t *handle,
 	case ESL_EVENT_CHANNEL_ANSWER:
 	{
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		//const char *eventbody=esl_event_get_body(event);
 		//printf("body:\n%s\n",eventbody);
 		string bridged_uuid;
@@ -183,7 +149,7 @@ void process_event(esl_handle_t *handle,
 	case ESL_EVENT_CHANNEL_OUTGOING:
 	{
 		string is_callout;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 																																   /*const char *eventbody=esl_event_get_body(event);
 			printf("body:\n%s\n",eventbody);*/
 		break;
@@ -191,7 +157,7 @@ void process_event(esl_handle_t *handle,
 	case ESL_EVENT_PLAYBACK_START:
 	{
 
-		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 
 		//���ſ�ʼ
 		{
@@ -207,7 +173,7 @@ void process_event(esl_handle_t *handle,
 		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
 		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		{
 			esl_log(ESL_LOG_INFO, "CALL IN ESL_EVENT_PLAYBACK_STOP %s\n", strUUID.c_str());
 		}
@@ -226,7 +192,7 @@ void process_event(esl_handle_t *handle,
 	{
 		a_uuid = esl_event_get_header(event, "variable_a_leg_uuid") ? esl_event_get_header(event, "variable_a_leg_uuid") : "";
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������?
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ����Ϊ1�������������??
 		/*const char *eventbody=esl_event_get_body(event);
 			printf("body:\n%s\n",eventbody);*/
 		string bridged_uuid;
@@ -287,18 +253,18 @@ void process_event(esl_handle_t *handle,
 				while (it != mapWord.end())
 				{
 
-					//������ƶ�?
+					//������ƶ�??
 					string tap = it->second;
 					esl_log(ESL_LOG_INFO, "tap=%s \n", tap.c_str());
 					char setVar[200];
 					snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
 
 					//
-					int pos = tap.find("肯定");
+					int pos = tap.find("�?�?");
 					int negPos = tap.find("否定");
-					int s1 = tmp.find("什么");
-					int s2 = tmp.find("没听清");
-					int s3 = tmp.find("听不清");
+					int s1 = tmp.find("什�?");
+					int s2 = tmp.find("没听�?");
+					int s3 = tmp.find("�?不清");
 					if (tmp.length() < 3 || s1 >= 0 || s2 >= 0 || s3 >= 0)
 					{
 						esl_log(ESL_LOG_INFO, "fpositive=44444444444\n", NULL);
@@ -405,4 +371,171 @@ void process_event(esl_handle_t *handle,
 		break;
 	}
 	}
+	return 0;
+}
+void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string uuid)
+{
+	// string param = playFile + " detect:unimrcp {start-input-timers=true,no-input-timeout=90000,recognition-timeout=90000}hello";
+
+	// esl_execute(handle, "play_and_detect_speech", param.c_str(), uuid.c_str());
+	// esl_execute(handle, "set", "play_and_detect_speech_close_asr=true", uuid.c_str());
+	//  esl_execute(handle, "detect_speech", "stop", uuid.c_str());
+
+	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
+	esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
+	esl_execute(handle, "park", NULL, uuid.c_str());
+}
+
+void FScall::run()
+{
+	LauchFScall();
+}
+int FScall::LauchFScall()
+{
+ 	esl_handle_t handle = {{0}};
+    esl_status_t status;
+    char uuid[128]; //从fs�?获得的uuid
+    //Then running the Call_Task string when added a new Task,then remove it
+    // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "�?先生，这里是�?众银行�?�催�?心打来的，我姓张。提醒您�?众银行微粒贷已经逾期，麻烦您尽快抽空处理�?");
+
+    esl_global_set_default_logger(ESL_LOG_LEVEL_INFO);
+
+    status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "tx@infosun");
+
+    if (status != ESL_SUCCESS)
+    {
+        esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
+        exit(1);
+    }
+
+    esl_send_recv(&handle, "bgapi originate user/1003 &park()");
+    // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "您好！�?�问您是陈大文陈先生�?");
+
+    if (handle.last_sr_event && handle.last_sr_event->body)
+    {
+        printf("[%s]\n", handle.last_sr_event->body);
+    }
+    else
+    {
+        printf("[%s] last_sr_reply\n", handle.last_sr_reply);
+    }
+	return 0;
+}
+void FSprocess::run()
+{
+	Inbound_Init();
+}
+
+
+static void *FSprocess::Inbound_Init(void *arg)
+{
+
+    esl_handle_t handle = {{0}};
+    esl_status_t status;
+    const char *uuid;
+
+    esl_global_set_default_logger(ESL_LOG_LEVEL_INFO);
+
+    status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "tx@infosun");
+
+    if (status != ESL_SUCCESS)
+    {
+        esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
+        exit(1);
+    }
+    esl_log(ESL_LOG_INFO, "Connected to FreeSWITCH\n");
+    esl_events(&handle, ESL_EVENT_TYPE_PLAIN,
+               "DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_BRIDGE CHANNEL_ANSWER CUSTOM sofia::register sofia::unregister");
+    esl_log(ESL_LOG_INFO, "%s\n", handle.last_sr_reply);
+
+    handle.event_lock = 1;
+    while ((status = esl_recv_event(&handle, 1, NULL)) == ESL_SUCCESS)
+    {
+        if (handle.last_ievent)
+        {
+            process_event(&handle, handle.last_ievent, gKeymap);
+        }
+    }
+    esl_disconnect(&handle);
+
+    return (void *)0;
+}
+
+
+
+static void *FSprocess::test_Process(void *arg)
+{
+    esl_handle_t handle = {{0}};
+    esl_status_t status;
+    char uuid[128]; //从fs�?获得的uuid
+    //Then running the Call_Task string when added a new Task,then remove it
+    // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "�?先生，这里是�?众银行�?�催�?心打来的，我姓张。提醒您�?众银行微粒贷已经逾期，麻烦您尽快抽空处理�?");
+
+    esl_global_set_default_logger(ESL_LOG_LEVEL_INFO);
+
+    status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "tx@infosun");
+
+    if (status != ESL_SUCCESS)
+    {
+        esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
+        exit(1);
+    }
+
+    esl_send_recv(&handle, "bgapi originate user/1003 &park()");
+    // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "您好！�?�问您是陈大文陈先生�?");
+
+    if (handle.last_sr_event && handle.last_sr_event->body)
+    {
+        printf("[%s]\n", handle.last_sr_event->body);
+    }
+    else
+    {
+        printf("[%s] last_sr_reply\n", handle.last_sr_reply);
+    }
+}
+
+
+
+
+void FSprocess::playDetectSpeech(string playFile, esl_handle_t *handle, string uuid)
+{
+	// string param = playFile + " detect:unimrcp {start-input-timers=true,no-input-timeout=90000,recognition-timeout=90000}hello";
+
+	// esl_execute(handle, "play_and_detect_speech", param.c_str(), uuid.c_str());
+	// esl_execute(handle, "set", "play_and_detect_speech_close_asr=true", uuid.c_str());
+	//  esl_execute(handle, "detect_speech", "stop", uuid.c_str());
+
+	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
+	esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
+	esl_execute(handle, "park", NULL, uuid.c_str());
+}
+
+string nodeState;
+
+void process_event(esl_handle_t *handle,
+				   esl_event_t *event,
+				   const map<uint32_t, base_script_t> &keymap)
+{
+	string caller_id, agentId;
+	string destination_number;
+	string a_uuid;
+	char tmp_cmd[1024] = {0};
+	string strUUID;
+	strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+	caller_id = esl_event_get_header(event, "Caller-Caller-ID-Number") ? esl_event_get_header(event, "Caller-Caller-ID-Number") : "";
+	destination_number = esl_event_get_header(event, "Caller-Destination-Number") ? esl_event_get_header(event, "Caller-Destination-Number") : "";
+
+	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
+
+	if (tmpNodeState.length() > 0)
+	{
+		nodeState = tmpNodeState;
+		esl_log(ESL_LOG_INFO, "node_state= %s\n", nodeState.c_str());
+	}
+	FSsession session;
+	session.caller_id = caller_id;
+	session.strUUID = strUUID;
+	session.destination_number = destination_number;
+	SessionPool.pushTask(session);
+
 }
