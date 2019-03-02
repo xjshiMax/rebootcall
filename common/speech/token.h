@@ -40,6 +40,7 @@ RETURN_CODE parse_token(const char *response, const char *scope, char *token);
  */
 RETURN_CODE obtain_json_str(const char *json, const char *key, char *value, int value_size);
 RETURN_CODE parse_positive_prob(const char *json, const char *key, char *value, int value_size);
+RETURN_CODE parse_ali_asr(const char *json, const char *key, char *value, int value_size);
 
 
 #endif //SPEECH_C_DEMO_TOKEN_H
