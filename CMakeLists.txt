@@ -6,7 +6,7 @@ include_directories("/root/package/mysqlcnn/include/jdbc")
 include_directories("common/ConcurrentQueue.hpp")
 #include_directories("common/nlp/nlp.h")
 
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -Wall -Wno-unused-variable -pthread -lmysqlcppconn -lboost_system -lboost_thread -lstdc++ -lcurl -lcrypto -ljsoncpp -lmsc -lrt")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -Wall -Wno-unused-variable -pthread -lmysqlcppconn  -lstdc++ -lcurl -lcrypto  -lmsc -lrt")
 link_directories("/usr/local/lib")
 link_directories("/usr/local/lib64")
 link_directories("/root/package/mysqlcnn/lib64")
