@@ -13,7 +13,7 @@
 
 using namespace std;
 using namespace inifile;
-map<uint32_t, base_script_t> gKeymap;
+
 
 
 
@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
     xReactorwithThread ReactorInst;
     TXTServer BussinessTCP;
     IniFile IniService;
-    IniService.Sload(Service.ini);
+    IniService.load(Service.ini);
     int iret=-1;
     string strIP=IniService.getStringValue("JAVABUSINESS","IP",&iret);
     if(iret!=0)

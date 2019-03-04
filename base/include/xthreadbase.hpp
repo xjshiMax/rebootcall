@@ -11,7 +11,7 @@
 #include "xAutoLock.hpp"
 //pthread_mutex_t zx;
 namespace SAEBASE{
-xMutex zx;
+//xMutex zx;
 #pragma once
 #ifdef  WIN32
 	typedef unsigned int (__stdcall*pfunc)(void*);
@@ -45,7 +45,8 @@ private:
 	pthread_t thr_id;
 #endif
 	bool bExit_;			//线程是否要退出标志
-
+	xCondition m_ConditionState;
+	xMutex m_LockState;
 };
 //面向对象的模式
 class xThread
@@ -79,11 +80,13 @@ public:
 #endif
 {
 
-	xAutoLock antolock(zx);
-	timeobj proxylife;
-	Threadbase* pbase=reinterpret_cast<Threadbase*> (arg);
+	//xAutoLock antolock(zx);
+	//timeobj proxylife;
+	Threadbase* pbase=static_cast<Threadbase*> (arg);
+	pbase->m_LockState.lock();
+	pbase->m_ConditionState.signal();
+	pbase->m_LockState.unlock();
 	pbase->run();
-	//Sleep(3000);
 	return 0;
 }
 
@@ -93,7 +96,7 @@ Threadbase::Threadbase(bool bDetach)
 }
 int Threadbase::start()
 {
-
+	xAutoLock L(m_LockState);
 #ifdef WIN32
 	unsigned int nval=_beginthreadex(0,0,thread_proxy,this,0,&thr_id);
 	thr_id=nval;
@@ -102,6 +105,7 @@ int Threadbase::start()
 	int arg=0;
 	pthread_create(&thr_id,NULL,thread_proxy,this);
 #endif
+	m_ConditionState.wait(m_LockState);
 	return 0;
 }
 int Threadbase::join()

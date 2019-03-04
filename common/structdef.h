@@ -2,6 +2,7 @@
 #define STRUCT_DEF_H
 
 #include <string>
+#include <stdint.h>
 using namespace std;
 
 /**
@@ -17,8 +18,8 @@ struct base_script_t {
     uint32_t nodeId;           ///当前结点ID
     string desc;          ///<流程描述
     uint32_t taskId; // 出口ID
-    string userWord;      ///<比较关键词 比如：关键词1:出口1|关键词2:出口2
-    string vox_base;      ///<语音文件根路径
+    string userWord;      ///<比较关键�? 比�?�：关键�?1:出口1|关键�?2:出口2
+    string vox_base;      ///<�?音文件根�?�?
 
 
     std::string bill_info();

@@ -71,7 +71,7 @@ protected:
 	size_t m_CurReadWaiter;	//当前对
 	size_t m_CurWriteWaiter;	//当前写等待
 
-	std::deque<Taskobj*> m_tasklist; //任务队列
+	std::deque<Taskobj> m_tasklist; //任务队列
 	xMutex m_LockTask;				//任务锁，配合条件变量一起使用
 	xCondition m_CondTask;			//条件变量，用来阻塞线程，等待任务。
 	xCondition m_CondTaskFree;
@@ -80,7 +80,7 @@ template <class Taskobj>
 void xTaskqueue<Taskobj>::setDeadstatus(void)
 {
 	xAutoLock L(m_LockTask);
-	m_IsActive = true;
+	m_IsActive = false;
 	m_CondTask.broadCast();
 	m_CondTaskFree.broadCast();
 }
@@ -135,9 +135,9 @@ bool xTaskqueue<Taskobj>::waitForTask(Taskobj&node,const struct timespec& timeva
 		if(!m_IsActive || m_tasklist.empty())
 			return false;
 	}
-	node = *m_tasklist.front();
-	m_CurTaskCount-=1;
+	node = m_tasklist.front();
 	m_tasklist.pop_front();
+	--m_CurTaskCount;
 	if(m_CurWriteWaiter)
 		m_CondTaskFree.signal();
 	return true;
@@ -146,13 +146,15 @@ template <class Taskobj>
 bool xTaskqueue<Taskobj>::pushTask(const Taskobj& node)
 {
 	xAutoLock L(m_LockTask);
+	if(!m_IsActive)
+		return false;
 	if(queueIsFull())
 	{
 		++m_CurWriteWaiter; 
 		m_CondTaskFree.wait(m_LockTask);
 		--m_CurWriteWaiter;
 	}
-	m_tasklist.push_back((Taskobj*)&node);
+	m_tasklist.push_back(node);
 	++m_CurTaskCount;
 	if(m_CurReadWaiter)
 		m_CondTask.signal();
@@ -183,7 +185,7 @@ bool xTaskqueue<Taskobj>::pushTaskWithTimeOut(const Taskobj& node,const struct t
 		if(!m_IsActive || queueIsFull())
 			return false;
 	}
-	m_tasklist.push_front((Taskobj*)&node);
+	m_tasklist.push_back((Taskobj)node);
 	++m_CurTaskCount;
 	if(m_CurReadWaiter)
 		m_CondTask.signal();

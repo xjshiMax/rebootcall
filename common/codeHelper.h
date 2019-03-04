@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <sstream>
 #include "../esl/esl_json.h"
 #include "speech/common.h"
 
@@ -15,10 +16,10 @@ using namespace std;
 
 struct tts_config
 {
-  char api_key[40];       // 填写网页上申请的appkey 如 $apiKey="g8eBUMSokVB1BHGmgxxxxxx"
-  char secret_key[40];    // 填写网页上申请的APP SECRET 如 $secretKey="94dc99566550d87f8fa8ece112xxxxx"
-  char text[512 * 3 + 1]; // 需要合成的文本  最多512个汉字
-  int text_len;           // 文本的长度
+  char api_key[40];       // �?写网页上申�?�的appkey �? $apiKey="g8eBUMSokVB1BHGmgxxxxxx"
+  char secret_key[40];    // �?写网页上申�?�的APP SECRET �? $secretKey="94dc99566550d87f8fa8ece112xxxxx"
+  char text[512 * 3 + 1]; // 需要合成的文本  最�?512�?汉字
+  int text_len;           // 文本的长�?
   char cuid[20];
   int spd;
   int pit;
@@ -31,12 +32,12 @@ struct tts_config
 class codeHelper
 {
 private:
-  //构造函数私有化
+  //构造函数�?�有�?
   codeHelper()
   {
   }
   static codeHelper *m_pInstance;
-  class CGarbo //它的唯一工作就是在析构函数中删除CSingleton的实例
+  class CGarbo //它的�?一工作就是在析构函数中删除CSingleton的实�?
   {
   public:
     ~CGarbo()
@@ -71,15 +72,15 @@ private:
 
 
   /**
- * 用以获取access_token的函数，使用时需要先在百度云控制台申请相应功能的应用，获得对应的API Key和Secret Key
- * @param access_token 获取得到的access token，调用函数时需传入该参数
+ * 用以获取access_token的函数，使用时需要先在百度云控制台申请相应功能的应用，获得�?�应的API Key和Secret Key
+ * @param access_token 获取得到的access token，调用函数时需传入该参�?
  * @param AK 应用的API key
  * @param SK 应用的Secret key
- * @return 返回0代表获取access token成功，其他返回值代表获取失败
+ * @return 返回0代表获取access token成功，其他返回值代表获取失�?
  */
   int get_access_token(std::string &access_token, const std::string &AK, const std::string &SK);
 
-  static CGarbo Garbo; //定义一个静态成员变量，程序结束时，系统会自动调用它的析构函数
+  static CGarbo Garbo; //定义一�?静态成员变量，程序结束时，系统会自动调用它的析构函�?
 public:
   static codeHelper *GetInstance(); //获取实例
   std::string UrlDecode(const std::string &str);

@@ -3,7 +3,8 @@
 
 #include <map>
 #include "structdef.h"
-
+#include <iostream>
+#include  <stdio.h>
 using namespace std;
 
 class db_operator_t {

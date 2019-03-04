@@ -34,8 +34,8 @@
 #define _MYSQL_CONNECTION_H_
 
 #include "cppconn/connection.h"
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
+#include "boost/shared_ptr.hpp"
+#include "boost/scoped_ptr.hpp"
 
 namespace sql
 {
