@@ -9,7 +9,8 @@
 //且实现逻辑：队列空的时候，读队列线程等待任务到来，写入队列的线程可以任意加入任务。
 //           队列满的时候，读队列线程可随意读，写入队列的线程等待。
 //           正常情况，队列未满且不空，任意线程读取（消耗），任意线程写入（生产）
-#include "xAutoLock.hpp"
+#pragma once
+#include "xAutoLock.h"
 #include <deque>
 namespace SAEBASE{
 template <typename Taskobj>
