@@ -1,8 +1,9 @@
 #include "process_event.h"
+#include "common/DBOperator.h"
 #include <iostream>
 #include <string>
 using namespace std;
-int gIsAsr=1;
+int gIsAsr=0;
 int FSsession::run()
 {
 	Action();
@@ -13,6 +14,7 @@ void FSsession::Action()
 	map<uint32_t, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	string a_uuid;
 	char tmp_cmd[1024] = {0};
+	//cout<<"event->event_id:"<<event->event_id<<endl;
 	switch (event->event_id)
 	{
 
@@ -531,13 +533,21 @@ void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string u
 	//  esl_execute(handle, "detect_speech", "stop", uuid.c_str());
 
 	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
-	esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
-	esl_execute(handle, "park", NULL, uuid.c_str());
+	// esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
+	esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", uuid.c_str());
+
 }
 
 void FScall::run()
 {
+	GetnumbrList();
 	LauchFScall();
+}
+int FScall::GetnumbrList()
+{
+	  db_operator_t::initDatabase();
+	  db_operator_t::GetnumberList(m_NumberSet,m_taskID);
+	  return 0;
 }
 int FScall::LauchFScall()
 {
@@ -588,7 +598,8 @@ void *FSprocess::Inbound_Init(void *arg)
 
     esl_global_set_default_logger(ESL_LOG_LEVEL_INFO);
 
-    status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "ClueCon");
+    //status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "ClueCon");
+	status = esl_connect(&handle, "210.21.48.69", 8021, NULL, "tx@infosun");
 
     if (status != ESL_SUCCESS)
     {
@@ -597,7 +608,7 @@ void *FSprocess::Inbound_Init(void *arg)
     }
     esl_log(ESL_LOG_INFO, "Connected to FreeSWITCH\n");
     esl_events(&handle, ESL_EVENT_TYPE_PLAIN,
-               "DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_BRIDGE CHANNEL_ANSWER CUSTOM sofia::register sofia::unregister");
+               "DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_BRIDGE CHANNEL_ANSWER CUSTOM sofia::register sofia::unregister asr");
     esl_log(ESL_LOG_INFO, "%s\n", handle.last_sr_reply);
 
     handle.event_lock = 1;
@@ -625,7 +636,7 @@ void *FSprocess::Inbound_Init(void *arg)
 
     esl_global_set_default_logger(ESL_LOG_LEVEL_INFO);
 
-    status = esl_connect(&handle, "127.0.0.1", 8021, NULL, "ClueCon");
+    status = esl_connect(&handle, "210.21.48.69", 8021, NULL, "tx@infosun");
 
     if (status != ESL_SUCCESS)
     {
@@ -634,7 +645,7 @@ void *FSprocess::Inbound_Init(void *arg)
     }
 
 
-    esl_send_recv(&handle, "bgapi originate user/1003 &park()");
+    esl_send_recv(&handle, "bgapi originate user/1006 &park()");
     // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "您好！???问您是陈大文陈先生??");
 
     if (handle.last_sr_event && handle.last_sr_event->body)
@@ -654,6 +665,9 @@ void FSprocess::process_event(esl_handle_t *handle,
 				   esl_event_t *event,
 				   const map<uint32_t, base_script_t> &keymap)
 {
+	//cout<<"in process_event:event->id:"<<event->event_id<<endl;
+	//const char *eventbody = esl_event_get_body(event);
+	//cout<<"in process_event:event->body:"<<eventbody<<endl;
 
 	string caller_id, agentId;
 	string destination_number;
@@ -665,19 +679,19 @@ void FSprocess::process_event(esl_handle_t *handle,
 	destination_number = esl_event_get_header(event, "Caller-Destination-Number") ? esl_event_get_header(event, "Caller-Destination-Number") : "";
 
 	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
-	cout<<"strUUID:"<<strUUID<<endl;
+	//cout<<"strUUID:"<<strUUID<<endl;
 	//if (tmpNodeState.length() > 0)
 //	{
 //		nodeState = tmpNodeState;
 //		esl_log(ESL_LOG_INFO, "node_state= %s\n", nodeState.c_str());
 //	}
-	if(m_SessionSet.find(strUUID)!=m_SessionSet.end())
-	{
-		m_SessionSet[strUUID].run();
-	}
-	else
-	{
-		FSsession session;
+// 	if(m_SessionSet.find(strUUID)!=m_SessionSet.end())
+// 	{
+// 		m_SessionSet[strUUID].Action();
+// 	}
+// 	else
+// 	{
+		static FSsession session;
 		session.caller_id = caller_id;
 		session.strUUID = strUUID;
 		session.destination_number = destination_number;
@@ -685,9 +699,9 @@ void FSprocess::process_event(esl_handle_t *handle,
 		session.handle=handle;
 		//SessionPool.pushTask(session);
 		//m_SessionSet[strUUID]=session;
-		session.run();
-		m_SessionSet[strUUID]=session;
-	}
+		session.Action();
+	//	m_SessionSet[strUUID]=session;
+	//}
 	
 
 }

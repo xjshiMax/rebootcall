@@ -2,6 +2,7 @@
 #define __DBOPERATOR_H
 
 #include <map>
+#include <vector>
 #include "structdef.h"
 #include <iostream>
 #include  <stdio.h>
@@ -11,6 +12,7 @@ class db_operator_t {
 public:
     static bool initDatabase();
     static bool SelectSql(map<uint32_t,base_script_t>& vSpeech,int32_t voiceVer);
+	static bool GetnumberList(vector<string>&numberlist,string taskid);
 };
 
 #endif

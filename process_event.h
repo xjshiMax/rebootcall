@@ -46,10 +46,17 @@ class FSsession:public xtaskbase
 class FScall:public Threadbase
 {
 public:
+	FScall()
+	{
+
+	}
 	virtual void run();
+	int GetnumbrList();
 	int LauchFScall();
-	//void setCallNumber(string number){m_callnumber=number;}
-	//string m_callnumber;
+	void setCallNumber(string number){m_taskID=number;}
+	string m_callnumber;
+	string m_taskID;
+	std::vector<string>m_NumberSet;
 };
 
 /* 处理fs回传消息中心， 使用线程池管理FSsession*/
