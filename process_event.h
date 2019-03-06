@@ -31,16 +31,24 @@ class FSprocess;
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState("1"){}
+		FSsession():nodeState("1"),m_channelpath(""){}
 		virtual int run();
 		void Action();
 		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
-	string strUUID; 
-	string caller_id ;
-	string destination_number;
-	esl_event_t *event;
-	esl_handle_t *handle;
-	string nodeState;
+		void SetSessionID(string sessionid){m_parksessionID=sessionid;}
+		string GetSessionID(){return m_parksessionID;};
+	public:
+		esl_handle_t *handle;
+		esl_event_t *event;
+		string strUUID; 
+		string caller_id ;
+		string destination_number;
+		string nodeState;		 //流程状态
+		string m_parksessionID;  //会话id
+		string m_speeckCraftID;  //话术id
+		string m_taskID;		 //任务id
+		string m_channelpath;	 //语音的channel值，初始为空。
+
 };
 /* 发送fs批量呼叫请求 one-task-one-thread*/
 class FScall:public Threadbase
@@ -68,15 +76,20 @@ public:
 		//SessionPool.initsimplePool();
 		//SessionPool.startPool();
 	}
-virtual void run();
-static void *Inbound_Init(void *arg);
-static void *test_Process(void *arg);
-static void  process_event(esl_handle_t *handle,
+	virtual void run();
+	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number);
+	void *Inbound_Init(void *arg);
+	static void *test_Process(void *arg);
+	void  process_event(esl_handle_t *handle,
 				   esl_event_t *event,
 				   const map<uint32_t,base_script_t>& keymap);
-static map<uint32_t, base_script_t> m_gKeymap;
-//xthreadPool SessionPool;
-static map<string,FSsession> m_SessionSet;
-};
+	static esl_handle_t* getSessionhandle(){return m_sessionHandle;}
+	FSsession* GetSessionbychannelid(string channel);
 
+	static map<uint32_t, base_script_t> m_gKeymap;
+//xthreadPool SessionPool;
+	static map<string,FSsession*> m_SessionSet;
+	static esl_handle_t* m_sessionHandle;
+	xMutex m_sessionlock;
+};
 

@@ -62,6 +62,9 @@ int main(int argc, char const *argv[])
     FSprocess FSprocessInst;
     FSprocessInst.start();
 
+	//注册语音转文本事件
+	//FSasrprocess FSasrprocessInst;
+	//FSasrprocessInst.start();
     pthread_t pthid3;
     int ret = pthread_create(&pthid3, NULL, FSprocess::test_Process, NULL);
     if (ret) // 闈?0鍒欏垱寤哄け璐?
