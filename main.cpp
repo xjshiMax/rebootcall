@@ -27,7 +27,7 @@ int main(int argc, char const *argv[])
 
     db_operator_t::initDatabase();
     db_operator_t::SelectSql(FSprocess::m_gKeymap, 2);
-    
+    db_operator_t::GetKnowledge(FSprocess::m_knowledgeSet,2);
     map<uint32_t, base_script_t>::iterator strmap_iter = FSprocess::m_gKeymap.begin();
     for (; strmap_iter != FSprocess::m_gKeymap.end(); strmap_iter++)
     {
@@ -60,18 +60,19 @@ int main(int argc, char const *argv[])
 
     //注册fs事件响应。
     FSprocess FSprocessInst;
+	FSprocessInst.Initability();
     FSprocessInst.start();
 
 	//注册语音转文本事件
 	//FSasrprocess FSasrprocessInst;
 	//FSasrprocessInst.start();
-    pthread_t pthid3;
-    int ret = pthread_create(&pthid3, NULL, FSprocess::test_Process, NULL);
-    if (ret) // 闈?0鍒欏垱寤哄け璐?
-    {
-        perror("createthread 3 failed.\n");
-        return 1;
-    }
+    //pthread_t pthid3;
+    //int ret = pthread_create(&pthid3, NULL, FSprocess::test_Process, NULL);
+    //if (ret) // 闈?0鍒欏垱寤哄け璐?
+    //{
+    //    perror("createthread 3 failed.\n");
+    //    return 1;
+    //}
     FSprocessInst.join();
 
 

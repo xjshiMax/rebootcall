@@ -4,6 +4,7 @@
 #include "base/include/xTcpServerBase.h"
 #include "process_event.h"
 using namespace SAEBASE;
+static bool IsInit=false;
 class TXTCPServer:public xTcpServerBase
 {
     public:
@@ -17,8 +18,13 @@ class TXTCPServer:public xTcpServerBase
 		cout<<date<<endl;
 		//收到批量请求
 		static FScall Onecall;
-		Onecall.setCallNumber(date);
-		//Onecall.S
+
+		Onecall.Initability();
+		IsInit=true;
+
+		//Onecall.Initability();
+		if (!Onecall.Getablibity(date))
+			return 0;
 		Onecall.start();
 
 		return 0;

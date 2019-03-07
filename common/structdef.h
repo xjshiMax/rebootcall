@@ -25,5 +25,12 @@ struct base_script_t {
     std::string bill_info();
 };
 
+typedef struct base_knowledge{
+	uint32_t  voice_version_id;
+	string desc; 
+	string record;
+	string keyword; //#·Ö¸î½âÎö
+	uint32_t taskId;
+}base_knowledge_t;
 
 #endif
