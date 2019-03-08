@@ -48,6 +48,7 @@ xEpollDemultiplexer::xEpollDemultiplexer()
 }
 xEpollDemultiplexer::~xEpollDemultiplexer()
 {
+	printf("~xEpollDemultiplexer\n");
 	::close(m_epoll_fd);
 }
 

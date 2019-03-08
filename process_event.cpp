@@ -52,13 +52,31 @@ void FSsession::SetFinnallabel()
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
 	cJSON *root = cJSON_Parse(keyword.c_str());
+	if(!root) //如果解析失败，直接返回到 SC_Contect_nextTime
+	{
+		esl_log(ESL_LOG_INFO,"json parse failed, turn to SC_Contect_nextTime\n");
+		return SC_Contect_nextTime;
+	}
 	cJSON* item=root->child;
 	bool checked=false;
 	while(item!=NULL)
 	{
 		string strkey=item->string;
-		string strwork=cJSON_GetObjectItem(item,"word")->valuestring;
-		int nodeNum=cJSON_GetObjectItem(item,"node")->valueint;
+		int nodeNum=SC_Contect_nextTime;
+		cJSON*cnode=cJSON_GetObjectItem(item,"node");
+		if(!cnode)
+		{
+			esl_log(ESL_LOG_INFO,"node parse failed, turn to SC_Contect_nextTime\n");
+		}
+		nodeNum=cJSON_GetObjectItem(item,"node")->valueint;
+		string strwork="";
+		cJSON*cword=cJSON_GetObjectItem(item,"word");
+		if(!cword)
+		{
+			esl_log(ESL_LOG_INFO,"node parse failed, turn to SC_Contect_nextTime\n");
+		}
+		strwork=cJSON_GetObjectItem(item,"word")->valuestring;
+		//int nodeNum=cJSON_GetObjectItem(item,"node")->valueint;
 		int iret1=strkey.find("out_tab");
 		int iret2=strkey.find_first_of("out_tab");
 		if(strkey.find("out_tab")!=string::npos)
@@ -89,7 +107,10 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 		}//out_tab
 		else if(strkey.find("in_tab")!=string::npos)
 		{
-			string strtype=cJSON_GetObjectItem(item,"type")->valuestring;
+			cJSON*ptype=cJSON_GetObjectItem(item,"type");
+			string strtype="#";
+			if(ptype)
+				strtype=ptype->valuestring;
 			while(strwork!="")//需要分割解析
 			{
 				size_t pos = strwork.find("#");
@@ -160,7 +181,6 @@ void FSsession::Action()
 	map<uint32_t, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	vector<base_knowledge_t> knowledgeset=FSprocess::m_knowledgeSet;
 	string a_uuid=GetSessionID();
-	printf("16 getparksessionid:%s\n",a_uuid.c_str());
 	char tmp_cmd[1024] = {0};
 	//cout<<"event->event_id:"<<event->event_id<<endl;
 	switch (event->event_id)
@@ -186,7 +206,7 @@ void FSsession::Action()
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);	
 
 			int pos = asrResp.find("text");
-			if (pos>=0) {
+			if (pos<0) {
 
 				return ;
 			}
@@ -197,134 +217,136 @@ void FSsession::Action()
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
 				string asrText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
-				map<uint32_t, base_script_t>::iterator iter = nodeMap.find(nodeState);
-				string keywordText = iter->second.userWord;
+				map<uint32_t, base_script_t>::iterator tempiter = nodeMap.find(nodeState);
+				string keywordText = tempiter->second.userWord;
 				esl_log(ESL_LOG_INFO, "current nodestatus:%d,Result is keyword :%s\n", nodeState,keywordText.c_str());
 
-				if (!keywordText.empty())
-				{
-	
-						//esl_log(ESL_LOG_INFO, "keywordText=%s \n", keywordText.c_str());
-						char setVar[200];
-					//	snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
-						vector<base_knowledge_t>::iterator knowledgeite=knowledgeset.begin();
-						int nextstate=0;
-						string know_path;
-						bool b_getknow_path=false;
-						while(knowledgeite!=knowledgeset.end())
+					//esl_log(ESL_LOG_INFO, "keywordText=%s \n", keywordText.c_str());
+					char setVar[200];
+				//	snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
+					vector<base_knowledge_t>::iterator knowledgeite=knowledgeset.begin();
+					int nextstate=0;
+					string know_path;
+					bool b_getknow_path=false;
+					while(knowledgeite!=knowledgeset.end())
+					{
+						string strwork=knowledgeite->keyword;
+						while(strwork!="")//需要分割解析
 						{
-							string strwork=knowledgeite->keyword;
-							while(strwork!="")//需要分割解析
+							size_t pos = strwork.find("#");
+							if(pos != std::string::npos)
 							{
-								size_t pos = strwork.find("#");
-								if(pos != std::string::npos)
+								std::string x = strwork.substr(0,pos);
+								if(asrText.find(x)!=std::string::npos)
 								{
-									std::string x = strwork.substr(0,pos);
-									if(asrText.find(x)!=std::string::npos)
+									string tempkeyword=knowledgeite->keyword;
+									esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
+									nextstate=SC_KnowledgeLib;
+									know_path=knowledgeite->record;
+									b_getknow_path=true;
+									break;
+								}
+								strwork=strwork.substr(pos+1);
+							}
+							else
+							{
+								if(asrText.find(strwork)!=std::string::npos)
+								{
+									if(asrText.find(strwork)!=std::string::npos)
 									{
+										string tempkeyword=knowledgeite->keyword;
+										esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
 										nextstate=SC_KnowledgeLib;
 										know_path=knowledgeite->record;
 										b_getknow_path=true;
 										break;
 									}
-									strwork=strwork.substr(pos+1);
 								}
-								else
-								{
-									if(asrText.find(strwork)!=std::string::npos)
-									{
-										if(asrText.find(strwork)!=std::string::npos)
-										{
-											nextstate=SC_KnowledgeLib;
-											know_path=knowledgeite->record;
-											b_getknow_path=true;
-											break;
-										}
-									}
-									strwork="";
-								}
+								strwork="";
 							}
-							if(b_getknow_path)break;
-							knowledgeite++;
 						}
-						if(!nextstate)
-							nextstate=Getnextstatus(asrText,keywordText);
-						switch(nextstate)
-						{
-						case SC_Opening_Remarks:
-							{
-								nodeState=SC_Opening_Remarks;
-							}
-							break;
-						case SC_Add_In_Wechat:
-							{
-								nodeState=SC_Add_In_Wechat;
-							}
-							break;
-						case	SC_Additive_Group:
-							{
-								nodeState=SC_Additive_Group;
-							}
-							break;
-						case	SC_Add_Back_Wechat:
-							{
-								nodeState=SC_Add_Back_Wechat;
-
-									//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-							}
-							break;
-						case	SC_Bye:
-							{
-								nodeState=SC_Bye;
-								//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-							}
-							break;
-						case	SC_Contect_nextTime:
-							{
-								nodeState=SC_Contect_nextTime;
-								//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-							}
-							break;
-						case	SC_Seeking_Attention:
-							{
-								nodeState=SC_Seeking_Attention;
-							}
-							break;
-						case SC_KnowledgeLib:
-							{
-								esl_status_t t=esl_execute(handle, "playback", know_path.c_str(), a_uuid.c_str());
-								m_DB_talk_times+=1;
-								esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
-								m_IsAsr=true;
-								return ;
-							}
-
-						}//switch
-						map<uint32_t, base_script_t>::iterator iter;
-						iter = nodeMap.find(nodeState);
-						if (iter != nodeMap.end())
-						{
-							base_script_t node = iter->second;
-							node.vox_base += ".wav";
-							printf("100 stop_asr uuid:%s",strUUID.c_str());
-							esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
-							esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
-							m_DB_talk_times+=1;
-							esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
-						//	return;
-						}
-						else
-						{
-							esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
-						}
-						if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
-						{
-							esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
-							esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-						}
-						m_IsAsr=true;
-						return;
+						if(b_getknow_path)break;
+						knowledgeite++;
 					}
+					if(!nextstate&&keywordText!="")
+					{
+						nextstate=Getnextstatus(asrText,keywordText);
+					}
+					switch(nextstate)
+					{
+					case SC_Opening_Remarks:
+						{
+							nodeState=SC_Opening_Remarks;
+						}
+						break;
+					case SC_Add_In_Wechat:
+						{
+							nodeState=SC_Add_In_Wechat;
+						}
+						break;
+					case	SC_Additive_Group:
+						{
+							nodeState=SC_Additive_Group;
+						}
+						break;
+					case	SC_Add_Back_Wechat:
+						{
+							nodeState=SC_Add_Back_Wechat;
+
+								//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+						}
+						break;
+					case	SC_Bye:
+						{
+							nodeState=SC_Bye;
+							//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+						}
+						break;
+					case	SC_Contect_nextTime:
+						{
+							nodeState=SC_Contect_nextTime;
+							//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+						}
+						break;
+					case	SC_Seeking_Attention:
+						{
+							nodeState=SC_Seeking_Attention;
+						}
+						break;
+					case SC_KnowledgeLib:
+						{
+							esl_status_t t=esl_execute(handle, "playback", know_path.c_str(), a_uuid.c_str());
+							m_DB_talk_times+=1;
+							esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
+							m_IsAsr=true;
+							return ;
+						}
+
+					}//switch
+					map<uint32_t, base_script_t>::iterator iter;
+					iter = nodeMap.find(nodeState);
+					if (iter != nodeMap.end())
+					{
+						base_script_t node = iter->second;
+						node.vox_base += ".wav";
+						printf("100 stop_asr uuid:%s",strUUID.c_str());
+						esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
+						esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
+						m_DB_talk_times+=1;
+						esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
+					//	return;
+					}
+					else
+					{
+						esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
+					}
+					if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
+					{
+						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
+						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+					}
+					m_IsAsr=true;
+					return;
 				}
 			}//asr
 
@@ -340,7 +362,7 @@ void FSsession::Action()
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
 		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : "";
 		const char *eventbody = esl_event_get_body(event);
 		printf("body:\n%s\n", eventbody);
 		esl_log(ESL_LOG_INFO, "dtmf :%s\n", dtmf.c_str());
@@ -374,8 +396,10 @@ void FSsession::Action()
 		string recordpath=Getrecordpath();
 		char filename[48];
 		sprintf(filename,"%s/%s_%d.wav",recordpath.c_str(),caller_id.c_str(),GetUTCtimestamp());
+		//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
 		esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
 		sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
+		//sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
 		esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
 		esl_send_recv_timed(handle, tmp_cmd, 1000);
 		this->m_DB_recording_file= filename;
@@ -628,6 +652,11 @@ void FScall::Initability()
 	}
 	iret=-1;
 }
+FScall*FScall::Instance()
+{
+	return m_inst;
+}
+FScall*FScall::m_inst=new FScall;
 bool FScall::Getablibity(string jsonstr)
 {
 	cJSON *root = cJSON_Parse(jsonstr.c_str());
@@ -687,14 +716,15 @@ int FScall::LauchFScall()
         esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
         exit(1);
     }
-	esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}user/1006 &park()");
+	//esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}user/1006 &park()");
     //esl_send_recv(&handle, "bgapi originate user/1003 &park()");
 	char callCmd[256];
 	vector<string>::iterator ite=m_NumberSet.begin();
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
 	while(ite!=m_NumberSet.end())
 	{
-		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
+		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}sofia/gateway/ingw/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
+		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);
 		ite++;
@@ -707,7 +737,33 @@ int FScall::LauchFScall()
     {
         printf("[%s] last_sr_reply\n", handle.last_sr_reply);
     }
+	m_IsAllend=true;
 	return 0;
+}
+
+void FScallManager::CheckEndCall()
+{
+	map<string,FScall*>::iterator CheckIte=m_TaskSet.begin();
+	while(CheckIte!=m_TaskSet.end())
+	{
+		FScall*pcall=CheckIte->second;
+		if(pcall==NULL)
+		{
+			 m_TaskSet.erase(CheckIte++);
+			 continue;
+		}
+		if(pcall->m_IsAllend)
+		{
+			 m_TaskSet.erase(CheckIte++);
+			 delete pcall;
+			 pcall=NULL;
+			 continue;
+		}
+		else
+		{
+			CheckIte++;
+		}
+	}
 }
 map<uint32_t, base_script_t> FSprocess::m_gKeymap;
 vector<base_knowledge_t>FSprocess::m_knowledgeSet;
@@ -820,6 +876,7 @@ void *FSprocess::Inbound_Init(void *arg)
             process_event(&handle, handle.last_ievent, m_gKeymap,m_knowledgeSet);
         }
     }
+	esl_log(ESL_LOG_INFO,"status=%d,--------\n",status);
     esl_disconnect(&handle);
 
     return (void *)0;
@@ -875,10 +932,10 @@ void FSprocess::process_event(esl_handle_t *handle,
 	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
 	string strtaskname=esl_event_get_header(event, "Variable_taskname") ? esl_event_get_header(event, "Variable_taskname") : "";
 	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
-	printf("strscraftID:%s\n",strscraftID.c_str());
+	//printf("strscraftID:%s\n",strscraftID.c_str());
 // 	if(strUUID=="")
 // 		return;
-	printf("strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
+	//printf("strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
 	switch (event->event_id)
 	{
 	case ESL_EVENT_CUSTOM:
@@ -920,8 +977,10 @@ void FSprocess::process_event(esl_handle_t *handle,
 			}
 			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname);
 			m_SessionSet[strUUID]=psession;
-			esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
+			esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
 			//esl_execute(handle, "playback", "/root/txcall/play/2a.wav", strUUID.c_str());
+			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
+
 		}
 		break;
 	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
@@ -932,7 +991,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 			{
 				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", strUUID.c_str());
 			}
-			esl_execute(FSprocess::getSessionhandle(), "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
+			//esl_execute(FSprocess::getSessionhandle(), "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
 			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
 			if(ite!=m_SessionSet.end())
 			{
@@ -940,6 +999,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 				m_SessionSet.erase(strUUID);
 				if(psession!=NULL)
 				{
+					esl_execute(FSprocess::getSessionhandle(), "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
 					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
 					psession->InsertSessionResult();
 					delete psession;

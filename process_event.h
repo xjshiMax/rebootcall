@@ -78,9 +78,15 @@ class FSsession:public xtaskbase
 class FScall:public Threadbase
 {
 public:
-	FScall()
+	FScall():m_IsAllend(false)
 	{
 
+	}
+	virtual ~FScall()
+	{
+		//if(m_inst)
+		//	delete m_inst;
+		cout<<"~FScall is called;"<<endl;
 	}
 	void Initability();
 	virtual void run();
@@ -96,6 +102,18 @@ public:
 	int m_fsPort;
 	string m_fsPassword;
 	std::vector<string>m_NumberSet;
+	static FScall*Instance();
+	static FScall*m_inst;
+	bool m_IsAllend;		//电话号码全部拨打完毕
+};
+//管理通话任务类
+class FScallManager
+{
+public:
+	FScallManager(){};
+	~FScallManager(){};
+	map<string ,FScall*>m_TaskSet;
+	void CheckEndCall();
 };
 
 /* 处理fs回传消息中心， 使用线程池管理FSsession*/
@@ -106,6 +124,10 @@ public:
 	{
 		//SessionPool.initsimplePool();
 		//SessionPool.startPool();
+	}
+	~FSprocess()
+	{
+		cout<<"~FSprocess is called"<<endl;
 	}
 	void Initability();
 	virtual void run();

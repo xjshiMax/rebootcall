@@ -174,7 +174,7 @@ string codeHelper::sentiment_classifyRequesst(const string &text)
     if (NULL != pCurl)
     {
         // 设置超时时间�?1�?
-        curl_easy_setopt(pCurl, CURLOPT_TIMEOUT, 10);
+        curl_easy_setopt(pCurl, CURLOPT_TIMEOUT, 5);
 
         // First set the URL that is about to receive our POST.
         // This URL can just as well be a

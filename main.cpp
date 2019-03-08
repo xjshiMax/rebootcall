@@ -74,7 +74,9 @@ int main(int argc, char const *argv[])
     //    return 1;
     //}
     FSprocessInst.join();
-
+	esl_log(ESL_LOG_INFO,"FSprocessInst thread is end\n");
+	ReactorInst.join();
+	esl_log(ESL_LOG_INFO,"out of main\n");
 
 
 

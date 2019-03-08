@@ -25,7 +25,7 @@ public:
 // 	{
 // 		m_reactorimp = new xReactorImplentation();
 // 	}
-	~xReactor();
+	virtual ~xReactor();
 	int start() //启动事件循环
 	{
 		HandlerEvents();
@@ -87,6 +87,7 @@ xReactor::xReactor()
 }
 xReactor::~xReactor()
 {
+	printf("~xReactor\n");
 	if(m_reactorimp!=NULL)
 		delete m_reactorimp;
 }

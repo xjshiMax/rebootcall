@@ -8,6 +8,8 @@ static bool IsInit=false;
 class TXTCPServer:public xTcpServerBase
 {
     public:
+	~TXTCPServer()
+	{cout<<"~TXTCPServer"<<endl;}
     virtual int Onaccept(int socketfd,char*date,int len,IN xEventHandler *clientHandle=NULL)
 	{
 		cout<<"get one connect"<<endl;
@@ -17,16 +19,14 @@ class TXTCPServer:public xTcpServerBase
 	{
 		cout<<date<<endl;
 		//收到批量请求
-		static FScall Onecall;
-
-		Onecall.Initability();
-		IsInit=true;
-
-		//Onecall.Initability();
-		if (!Onecall.Getablibity(date))
+		static FScallManager CallManager;
+		CallManager.CheckEndCall();
+		FScall* Onecall=new FScall;
+		Onecall->Initability();
+		if (!Onecall->Getablibity(date))
 			return 0;
-		Onecall.start();
-
+		Onecall->start();
+		CallManager.m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
 		return 0;
 	}
 	virtual int Onclose(int socketfd)
