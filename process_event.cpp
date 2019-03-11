@@ -205,17 +205,28 @@ void FSsession::Action()
 			string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);	
 
-			int pos = asrResp.find("text");
-			if (pos<0) {
-
+// 			int pos = asrResp.find("text");
+// 			if (pos<0) {
+// 
+// 				return ;
+// 			}
+			cJSON *textRoot= cJSON_Parse(asrResp.c_str());
+			cJSON*results_recognition=cJSON_GetObjectItem(textRoot,"results_recognition");
+			if(!results_recognition)
 				return ;
-			}
+			int arr1=cJSON_GetArraySize(results_recognition);
+			cJSON*word=cJSON_GetArrayItem(results_recognition,0);
+			string baiduasrText=word->valuestring;
+			if(baiduasrText=="")
+				return;
 			esl_log(ESL_LOG_INFO,"we find text in aspResp\n");
-			if (m_IsAsr && pos > 0)
+		//	if (m_IsAsr && pos > 0)
+			if(m_IsAsr)
 			{
 				m_IsAsr=false;
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
-				string asrText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+				//string asrText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+				string asrText=baiduasrText;
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
 				map<uint32_t, base_script_t>::iterator tempiter = nodeMap.find(nodeState);
 				string keywordText = tempiter->second.userWord;
@@ -841,6 +852,14 @@ FSsession* FSprocess::GetSessionbychannelid(string channel)
 	}
 	return NULL;
 }
+FSsession*FSprocess::GetSessionbymainUUID(string strmainid)
+{
+	map<string,FSsession*>::iterator ite=m_SessionSet.find(strmainid);
+	if(ite!=m_SessionSet.end())
+		return ite->second;
+	else
+		return NULL;
+}
 void *FSprocess::Inbound_Init(void *arg)
 {
 
@@ -904,6 +923,7 @@ void *FSprocess::Inbound_Init(void *arg)
 
 
 	esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}user/1006 &park()");
+	//esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}sofia/gateway/ingw/%s &park()");
 	//esl_send_recv(&handle, "bgapi originate user/1006 &park()");
     // codeHelper::GetInstance()->run("/root/txcall/tts/testcc", "您好！???问您是陈大文陈先生??");
 
@@ -932,6 +952,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
 	string strtaskname=esl_event_get_header(event, "Variable_taskname") ? esl_event_get_header(event, "Variable_taskname") : "";
 	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
+	//string strmainUUID=esl_event_get_header(event, "Variable_mainUUID") ? esl_event_get_header(event, "Variable_mainUUID") : "";
 	//printf("strscraftID:%s\n",strscraftID.c_str());
 // 	if(strUUID=="")
 // 		return;
@@ -951,8 +972,10 @@ void FSprocess::process_event(esl_handle_t *handle,
 				string coreuuid = esl_event_get_header(event, "Core-UUID") ? esl_event_get_header(event, "Core-UUID") : "";
 				esl_log(ESL_LOG_INFO, "coreuuid=%s\n", coreuuid.c_str());
 				string Channel = esl_event_get_header(event, "Channel") ? esl_event_get_header(event, "Channel") : "";
+				string strmainUUID = esl_event_get_header(event, "mainUUID") ? esl_event_get_header(event, "mainUUID") : "";
 				esl_log(ESL_LOG_INFO, "Channel=%s\n", Channel.c_str());
-				FSsession*psession = GetSessionbychannelid(Channel);
+				FSsession*psession = GetSessionbymainUUID(strmainUUID);
+				esl_log(ESL_LOG_INFO, "strmainUUID=%s\n", strmainUUID.c_str());
 				esl_log(ESL_LOG_INFO,"find the session by channel\n");
 				if(psession!=NULL)
 				{
@@ -977,8 +1000,13 @@ void FSprocess::process_event(esl_handle_t *handle,
 			}
 			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname);
 			m_SessionSet[strUUID]=psession;
-			esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+			m_sessionlock.lock();
+			char asrparam[256]={0};
+			sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
+			esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
+			//esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
 			//esl_execute(handle, "playback", "/root/txcall/play/2a.wav", strUUID.c_str());
+			m_sessionlock.unlock();
 			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
 
 		}
@@ -999,7 +1027,9 @@ void FSprocess::process_event(esl_handle_t *handle,
 				m_SessionSet.erase(strUUID);
 				if(psession!=NULL)
 				{
-					esl_execute(FSprocess::getSessionhandle(), "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+					m_sessionlock.lock();
+					//esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+					m_sessionlock.unlock();
 					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
 					psession->InsertSessionResult();
 					delete psession;

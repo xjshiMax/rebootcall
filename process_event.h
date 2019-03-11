@@ -139,6 +139,7 @@ public:
 				   const map<uint32_t,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
 	static esl_handle_t* getSessionhandle(){return m_sessionHandle;}
 	FSsession* GetSessionbychannelid(string channel);
+	FSsession*GetSessionbymainUUID(string strmainid);
 
 	static map<uint32_t, base_script_t> m_gKeymap;
 	static vector<base_knowledge_t>m_knowledgeSet;
