@@ -43,6 +43,7 @@ class FSsession:public xtaskbase
 		string Getcurrenttime();
 		int GetUTCtimestamp();
 		string Getrecordpath();
+		void Onanswar();
 		int Getnextstatus(string asrtext,string keyword);
 		void ChangetheTypeCount(string strtype);
 		void SetFinnallabel();

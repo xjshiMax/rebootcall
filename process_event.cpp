@@ -174,7 +174,32 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 	}
 
 }
+void FSsession::Onanswar()
+{
+	char tmp_cmd[1024] = {0};
+	string recordpath=Getrecordpath();
+	char filename[48];
+	sprintf(filename,"%s/%s_%d.wav",recordpath.c_str(),caller_id.c_str(),GetUTCtimestamp());
+	//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
+	esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
+	sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
+	//sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
+	esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
+	esl_send_recv_timed(handle, tmp_cmd, 1000);
+	this->m_DB_recording_file= filename;
+	map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
+	map<uint32_t, base_script_t> nodeMap = FSprocess::m_gKeymap;
+	iter = nodeMap.find(1);
+	if (iter != nodeMap.end())
+	{
+		base_script_t node = iter->second;
+		node.vox_base += ".wav";
+		esl_execute(handle, "set", "node_state=1", strUUID.c_str());
+		playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
 
+	}
+}
+//#define _Use_ALI_SDK
 void FSsession::Action()
 {
 	string event_subclass, contact, from_user;
@@ -204,29 +229,32 @@ void FSsession::Action()
 		{
 			string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);	
+			string asrParstText;
+#ifdef _Use_ALI_SDK
+			int pos = asrResp.find("text");
+			if (pos<0) {
 
-// 			int pos = asrResp.find("text");
-// 			if (pos<0) {
-// 
-// 				return ;
-// 			}
+				return ;
+			}
+			asrParstText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+#else 
 			cJSON *textRoot= cJSON_Parse(asrResp.c_str());
 			cJSON*results_recognition=cJSON_GetObjectItem(textRoot,"results_recognition");
 			if(!results_recognition)
 				return ;
 			int arr1=cJSON_GetArraySize(results_recognition);
 			cJSON*word=cJSON_GetArrayItem(results_recognition,0);
-			string baiduasrText=word->valuestring;
-			if(baiduasrText=="")
+			asrParstText=word->valuestring;
+#endif		
+			if(asrParstText=="")
 				return;
+
 			esl_log(ESL_LOG_INFO,"we find text in aspResp\n");
-		//	if (m_IsAsr && pos > 0)
 			if(m_IsAsr)
 			{
 				m_IsAsr=false;
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
-				//string asrText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
-				string asrText=baiduasrText;
+				string asrText=asrParstText;
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
 				map<uint32_t, base_script_t>::iterator tempiter = nodeMap.find(nodeState);
 				string keywordText = tempiter->second.userWord;
@@ -404,29 +432,26 @@ void FSsession::Action()
 		esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_PARK:inbound park :%s\n", strUUID.c_str());
 
 		esl_execute(handle, "answer", NULL, strUUID.c_str());
-		string recordpath=Getrecordpath();
-		char filename[48];
-		sprintf(filename,"%s/%s_%d.wav",recordpath.c_str(),caller_id.c_str(),GetUTCtimestamp());
-		//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
-		esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
-		sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
-		//sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
-		esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
-		esl_send_recv_timed(handle, tmp_cmd, 1000);
-		this->m_DB_recording_file= filename;
-		map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
-		iter = nodeMap.find(1);
-		if (iter != nodeMap.end())
-		{
-			base_script_t node = iter->second;
-			node.vox_base += ".wav";
-			esl_execute(handle, "set", "node_state=1", strUUID.c_str());
-		//	esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
-			//sleep(10);
-			//esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
-			playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
-
-		}
+// 		string recordpath=Getrecordpath();
+// 		char filename[48];
+// 		sprintf(filename,"%s/%s_%d.wav",recordpath.c_str(),caller_id.c_str(),GetUTCtimestamp());
+// 		//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
+// 		esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
+// 		sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
+// 		//sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
+// 		esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
+// 		esl_send_recv_timed(handle, tmp_cmd, 1000);
+// 		this->m_DB_recording_file= filename;
+// 		map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
+// 		iter = nodeMap.find(1);
+// 		if (iter != nodeMap.end())
+// 		{
+// 			base_script_t node = iter->second;
+// 			node.vox_base += ".wav";
+// 			esl_execute(handle, "set", "node_state=1", strUUID.c_str());
+// 			playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+// 
+// 		}
 
 		break;
 	}
@@ -738,6 +763,7 @@ int FScall::LauchFScall()
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);
+		sleep(1);
 		ite++;
 	}
     if (handle.last_sr_event && handle.last_sr_event->body)
@@ -1008,7 +1034,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 			//esl_execute(handle, "playback", "/root/txcall/play/2a.wav", strUUID.c_str());
 			m_sessionlock.unlock();
 			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
-
+			psession->Onanswar();
 		}
 		break;
 	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
@@ -1028,10 +1054,11 @@ void FSprocess::process_event(esl_handle_t *handle,
 				if(psession!=NULL)
 				{
 					m_sessionlock.lock();
-					//esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+					esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
 					m_sessionlock.unlock();
 					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
 					psession->InsertSessionResult();
+					esl_log(ESL_LOG_INFO,"call stop_asr uuid:%s\n",(psession->strUUID).c_str());
 					delete psession;
 				}
 			}
