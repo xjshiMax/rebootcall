@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 using namespace std;
+#define _Use_ALI_SDK
 typedef enum{
 	SC_Opening_Remarks=1,
 	SC_Add_In_Wechat,
@@ -44,10 +45,12 @@ void FSsession::SetFinnallabel()
 	{
 		m_DB_outbound_label="C";
 	}
-	else if(m_Ctimes>=1)
+	else if(m_Btimes>=1)
 	{
-		m_DB_outbound_label="C";
+		m_DB_outbound_label="B";
 	}
+	else
+		m_DB_outbound_label="D";
 }
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
@@ -179,7 +182,12 @@ void FSsession::Onanswar()
 	char tmp_cmd[1024] = {0};
 	string recordpath=Getrecordpath();
 	char filename[48];
-	sprintf(filename,"%s/%s_%d.wav",recordpath.c_str(),caller_id.c_str(),GetUTCtimestamp());
+	struct tm *tblock;
+	time_t timer = time(NULL);
+	char strtime[64]={0};
+	tblock = localtime(&timer);
+	sprintf(strtime,"%04d%02d%02d%02d%02d%02d",tblock->tm_year+1900,tblock->tm_mon+1,tblock->tm_mday,tblock->tm_hour,tblock->tm_min,tblock->tm_sec);
+	sprintf(filename,"%s/%s_%s.wav",recordpath.c_str(),caller_id.c_str(),strtime);
 	//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
 	esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
 	sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
@@ -199,7 +207,7 @@ void FSsession::Onanswar()
 
 	}
 }
-//#define _Use_ALI_SDK
+
 void FSsession::Action()
 {
 	string event_subclass, contact, from_user;
@@ -231,12 +239,13 @@ void FSsession::Action()
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);	
 			string asrParstText;
 #ifdef _Use_ALI_SDK
-			int pos = asrResp.find("text");
-			if (pos<0) {
-
-				return ;
-			}
-			asrParstText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+// 			int pos = asrResp.find("text");
+// 			if (pos<0) {
+// 
+// 				return ;
+// 			}
+// 			asrParstText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+			asrParstText=asrResp;
 #else 
 			cJSON *textRoot= cJSON_Parse(asrResp.c_str());
 			cJSON*results_recognition=cJSON_GetObjectItem(textRoot,"results_recognition");
@@ -1025,16 +1034,28 @@ void FSprocess::process_event(esl_handle_t *handle,
 				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER call in uuid:%s \n", strUUID.c_str());
 			}
 			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname);
+			if(psession==NULL)
+			{
+				esl_log(ESL_LOG_INFO,"CreateSession failed\n");
+				return ;
+			}
 			m_SessionSet[strUUID]=psession;
 			m_sessionlock.lock();
 			char asrparam[256]={0};
+#ifdef _Use_ALI_SDK
+			sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
+#else
 			sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
-			esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
+#endif
+			//esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
 			//esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
 			//esl_execute(handle, "playback", "/root/txcall/play/2a.wav", strUUID.c_str());
 			m_sessionlock.unlock();
 			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
+			psession->handle=handle;
+			psession->event=event;
 			psession->Onanswar();
+			esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
 		}
 		break;
 	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
