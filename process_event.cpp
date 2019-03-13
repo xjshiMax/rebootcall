@@ -4,6 +4,7 @@
 #include <string>
 #include <unistd.h>
 #include <sys/stat.h>
+#include "base/glog/linux/glog/logging.h"
 using namespace std;
 #define _Use_ALI_SDK
 typedef enum{
@@ -14,7 +15,8 @@ typedef enum{
 	SC_Bye,
 	SC_Contect_nextTime,
 	SC_Seeking_Attention,
-	SC_KnowledgeLib
+	SC_KnowledgeLib,
+	SC_Hungup
 }e_Speeckcase;
 int FSsession::run()
 {
@@ -37,6 +39,7 @@ void FSsession::ChangetheTypeCount(string strtype)
 }
 void FSsession::SetFinnallabel()
 {
+	LOG(INFO)<<"nodeState:"<<nodeState<<", m_Atimes:"<<m_Atimes<<"m_Ctimes:"<<m_Ctimes<<" m_Btimes"<<m_Btimes;
 	if(nodeState==SC_Add_Back_Wechat||(m_Atimes>=2&&m_Ctimes==0)) //命中两个A类关键字
 	{
 		m_DB_outbound_label="A";
@@ -140,37 +143,42 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 				}
 			}//while #
 		}
-		else if(strkey.find("tab_yes")!=string::npos)
-		{
-			if(checked)
-			{
-				cJSON_Delete(root);
-				return nodeNum;
-			}
-			string iretsent = codeHelper::GetInstance()->sentiment_classifyRequesst(asrtext);
-			checked=true;
-			float positive=atof(iretsent.c_str());
-			if(positive>0.5)
-			{
-				cJSON_Delete(root);
-				return nodeNum;
-			}
-		}
+// 		else if(strkey.find("tab_yes")!=string::npos)
+// 		{
+// 			if(checked)
+// 			{
+// 				cJSON_Delete(root);
+// 				return nodeNum;
+// 			}
+// 			string iretsent = codeHelper::GetInstance()->sentiment_classifyRequesst(asrtext);
+// 			checked=true;
+// 			float positive=atof(iretsent.c_str());
+// 			if(positive>0.5)
+// 			{
+// 				cJSON_Delete(root);
+// 				return nodeNum;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			if(checked)
+// 			{
+// 				cJSON_Delete(root);
+// 				return nodeNum;
+// 			}
+// 			string iretsent = codeHelper::GetInstance()->sentiment_classifyRequesst(asrtext);
+// 			checked=true;
+// 			float positive=atof(iretsent.c_str());
+// 			if(positive<=0.5)
+// 			{
+// 				cJSON_Delete(root);
+// 				return nodeNum;
+// 			}
+// 		}
 		else
 		{
-			if(checked)
-			{
-				cJSON_Delete(root);
-				return nodeNum;
-			}
-			string iretsent = codeHelper::GetInstance()->sentiment_classifyRequesst(asrtext);
-			checked=true;
-			float positive=atof(iretsent.c_str());
-			if(positive<=0.5)
-			{
-				cJSON_Delete(root);
-				return nodeNum;
-			}
+			esl_log(ESL_LOG_INFO,"can not match any ,SC_Bye,node=5\n");
+			return SC_Bye;
 		}
 		printf("%s\n",item->string);
 		item=item->next;
@@ -181,7 +189,7 @@ void FSsession::Onanswar()
 {
 	char tmp_cmd[1024] = {0};
 	string recordpath=Getrecordpath();
-	char filename[48];
+	char filename[64];
 	struct tm *tblock;
 	time_t timer = time(NULL);
 	char strtime[64]={0};
@@ -236,7 +244,10 @@ void FSsession::Action()
 		else if (event_subclass == "asr")
 		{
 			string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
-			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);	
+			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);
+			LOG(INFO)<<"asrResp="<<asrResp;
+			LOG(INFO)<<"strUUID="<<strUUID;
+			LOG(INFO)<<"m_IsAsr="<<m_IsAsr;
 			string asrParstText;
 #ifdef _Use_ALI_SDK
 // 			int pos = asrResp.find("text");
@@ -268,24 +279,38 @@ void FSsession::Action()
 				map<uint32_t, base_script_t>::iterator tempiter = nodeMap.find(nodeState);
 				string keywordText = tempiter->second.userWord;
 				esl_log(ESL_LOG_INFO, "current nodestatus:%d,Result is keyword :%s\n", nodeState,keywordText.c_str());
-
-					//esl_log(ESL_LOG_INFO, "keywordText=%s \n", keywordText.c_str());
-					char setVar[200];
-				//	snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
-					vector<base_knowledge_t>::iterator knowledgeite=knowledgeset.begin();
-					int nextstate=0;
-					string know_path;
-					bool b_getknow_path=false;
-					while(knowledgeite!=knowledgeset.end())
+				LOG(INFO)<<"current nodestatus:"<<nodeState<<" Result is keyword:"<<keywordText;
+				char setVar[200];
+			//	snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
+				vector<base_knowledge_t>::iterator knowledgeite=knowledgeset.begin();
+				int nextstate=0;
+				string know_path;
+				bool b_getknow_path=false;
+				while(knowledgeite!=knowledgeset.end())
+				{
+					string strwork=knowledgeite->keyword;
+					while(strwork!="")//需要分割解析
 					{
-						string strwork=knowledgeite->keyword;
-						while(strwork!="")//需要分割解析
+						size_t pos = strwork.find("#");
+						if(pos != std::string::npos)
 						{
-							size_t pos = strwork.find("#");
-							if(pos != std::string::npos)
+							std::string x = strwork.substr(0,pos);
+							if(asrText.find(x)!=std::string::npos)
 							{
-								std::string x = strwork.substr(0,pos);
-								if(asrText.find(x)!=std::string::npos)
+								string tempkeyword=knowledgeite->keyword;
+								esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
+								nextstate=SC_KnowledgeLib;
+								know_path=knowledgeite->record;
+								b_getknow_path=true;
+								break;
+							}
+							strwork=strwork.substr(pos+1);
+						}
+						else
+						{
+							if(asrText.find(strwork)!=std::string::npos)
+							{
+								if(asrText.find(strwork)!=std::string::npos)
 								{
 									string tempkeyword=knowledgeite->keyword;
 									esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
@@ -294,108 +319,102 @@ void FSsession::Action()
 									b_getknow_path=true;
 									break;
 								}
-								strwork=strwork.substr(pos+1);
 							}
-							else
-							{
-								if(asrText.find(strwork)!=std::string::npos)
-								{
-									if(asrText.find(strwork)!=std::string::npos)
-									{
-										string tempkeyword=knowledgeite->keyword;
-										esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
-										nextstate=SC_KnowledgeLib;
-										know_path=knowledgeite->record;
-										b_getknow_path=true;
-										break;
-									}
-								}
-								strwork="";
-							}
+							strwork="";
 						}
-						if(b_getknow_path)break;
-						knowledgeite++;
 					}
-					if(!nextstate&&keywordText!="")
+					if(b_getknow_path)break;
+					knowledgeite++;
+				}
+				if(!nextstate&&keywordText!="")
+				{
+					nextstate=Getnextstatus(asrText,keywordText);
+				}
+				switch(nextstate)
+				{
+				case SC_Opening_Remarks:
 					{
-						nextstate=Getnextstatus(asrText,keywordText);
+						nodeState=SC_Opening_Remarks;
 					}
-					switch(nextstate)
+					break;
+				case SC_Add_In_Wechat:
 					{
-					case SC_Opening_Remarks:
-						{
-							nodeState=SC_Opening_Remarks;
-						}
-						break;
-					case SC_Add_In_Wechat:
-						{
-							nodeState=SC_Add_In_Wechat;
-						}
-						break;
-					case	SC_Additive_Group:
-						{
-							nodeState=SC_Additive_Group;
-						}
-						break;
-					case	SC_Add_Back_Wechat:
-						{
-							nodeState=SC_Add_Back_Wechat;
-
-								//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-						}
-						break;
-					case	SC_Bye:
-						{
-							nodeState=SC_Bye;
-							//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-						}
-						break;
-					case	SC_Contect_nextTime:
-						{
-							nodeState=SC_Contect_nextTime;
-							//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-						}
-						break;
-					case	SC_Seeking_Attention:
-						{
-							nodeState=SC_Seeking_Attention;
-						}
-						break;
-					case SC_KnowledgeLib:
-						{
-							esl_status_t t=esl_execute(handle, "playback", know_path.c_str(), a_uuid.c_str());
-							m_DB_talk_times+=1;
-							esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
-							m_IsAsr=true;
-							return ;
-						}
-
-					}//switch
-					map<uint32_t, base_script_t>::iterator iter;
-					iter = nodeMap.find(nodeState);
-					if (iter != nodeMap.end())
+						nodeState=SC_Add_In_Wechat;
+					}
+					break;
+				case	SC_Additive_Group:
 					{
-						base_script_t node = iter->second;
-						node.vox_base += ".wav";
-						printf("100 stop_asr uuid:%s",strUUID.c_str());
-						esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
-						esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
+						nodeState=SC_Additive_Group;
+					}
+					break;
+				case	SC_Add_Back_Wechat:
+					{
+						nodeState=SC_Add_Back_Wechat;
+
+							//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+					}
+					break;
+				case	SC_Bye:
+					{
+						nodeState=SC_Bye;
+						//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+					}
+					break;
+				case	SC_Contect_nextTime:
+					{
+						nodeState=SC_Contect_nextTime;
+						//esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+					}
+					break;
+				case	SC_Seeking_Attention:
+					{
+						nodeState=SC_Seeking_Attention;
+					}
+					break;
+				case SC_KnowledgeLib:
+					{
+						esl_status_t t=esl_execute(handle, "playback", know_path.c_str(), a_uuid.c_str());
 						m_DB_talk_times+=1;
-						esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
-					//	return;
+						esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
+						m_IsAsr=true;
+						return ;
 					}
-					else
+				case SC_Hungup:
 					{
-						esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
-					}
-					if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
-					{
+						m_DB_talk_times+=1;
+						nodeState=SC_Hungup;
 						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
 						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+						return;
 					}
-					m_IsAsr=true;
-					return;
+
+				}//switch
+				map<uint32_t, base_script_t>::iterator iter;
+				iter = nodeMap.find(nodeState);
+				if (iter != nodeMap.end())
+				{
+					base_script_t node = iter->second;
+					node.vox_base += ".wav";
+					printf("100 stop_asr uuid:%s",strUUID.c_str());
+					esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
+					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
+					m_DB_talk_times+=1;
+					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
+					LOG(INFO)<<"playback the answar ,nodeState:"<<nodeState;
+				//	return;
 				}
+				else
+				{
+					esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
+				}
+				if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
+				{
+					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
+					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+				}
+				m_IsAsr=true;
+				return;
+			}//m_IsAsr
 			}//asr
 
 			// esl_execute(handle, "stop_asr", NULL, strUUID.c_str());
@@ -439,7 +458,7 @@ void FSsession::Action()
 	case ESL_EVENT_CHANNEL_PARK:
 	{
 		esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_PARK:inbound park :%s\n", strUUID.c_str());
-
+		LOG(INFO)<<"ESL_EVENT_CHANNEL_PARK:inbound park :"<<strUUID;
 		esl_execute(handle, "answer", NULL, strUUID.c_str());
 // 		string recordpath=Getrecordpath();
 // 		char filename[48];
@@ -481,6 +500,7 @@ void FSsession::Action()
 		{
 			esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_HANGUP:CALL IN  :%s\n", strUUID.c_str());
 			esl_log(ESL_LOG_INFO, "hangup cause:%s\n", hangup_cause.c_str());
+			LOG(INFO)<<"ESL_EVENT_CHANNEL_HANGUP:CALL IN  :"<<strUUID<<" hangup cause:"<<hangup_cause;
 		}
 		this->m_DB_end_stamp=Getcurrenttime();
 		this->m_DB_duration=GetUTCtimestamp()-this->m_DB_creatd_at;
@@ -1040,18 +1060,14 @@ void FSprocess::process_event(esl_handle_t *handle,
 				return ;
 			}
 			m_SessionSet[strUUID]=psession;
-			m_sessionlock.lock();
 			char asrparam[256]={0};
 #ifdef _Use_ALI_SDK
 			sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
 #else
 			sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
 #endif
-			//esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
-			//esl_execute(handle, "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
-			//esl_execute(handle, "playback", "/root/txcall/play/2a.wav", strUUID.c_str());
-			m_sessionlock.unlock();
 			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
+			LOG(INFO)<<"create a session:"<<strUUID;
 			psession->handle=handle;
 			psession->event=event;
 			psession->Onanswar();
@@ -1063,13 +1079,10 @@ void FSprocess::process_event(esl_handle_t *handle,
 			string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
 			string hangupTime = esl_event_get_header(event, "Caller-Channel-Hangup-Time") ? esl_event_get_header(event, "Caller-Channel-Hangup-Time") : "";
 			string recordFileName = esl_event_get_header(event, "variable_record_filename") ? esl_event_get_header(event, "variable_record_filename") : "";
-			{
-				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", strUUID.c_str());
-			}
-			//esl_execute(FSprocess::getSessionhandle(), "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", strUUID.c_str());
 			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
 			if(ite!=m_SessionSet.end())
 			{
+				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", strUUID.c_str());
 				FSsession*psession=ite->second;
 				m_SessionSet.erase(strUUID);
 				if(psession!=NULL)
@@ -1082,7 +1095,9 @@ void FSprocess::process_event(esl_handle_t *handle,
 					esl_log(ESL_LOG_INFO,"call stop_asr uuid:%s\n",(psession->strUUID).c_str());
 					delete psession;
 				}
+				LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
 			}
+			//LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
 			esl_log(ESL_LOG_INFO, "after destory session, uuid:%s,m_SessionSet.size()=%d \n",  strUUID.c_str(),m_SessionSet.size());
 		}
 		break;

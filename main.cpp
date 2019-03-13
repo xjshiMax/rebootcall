@@ -60,13 +60,14 @@ int main(int argc, char const *argv[])
 		logpath="/home";
 	}
 	iret =-1;
-	string loglevel=IniService.getStringValue("LOGCONF","loglevel",iret);
+	int loglevel=IniService.getIntValue("LOGCONF","loglevel",iret);
 	if(iret!=0)
 	{
-		loglevel="INFO";
+		loglevel=0;
 	}
 	FLAGS_log_dir =logpath;
 	google::InitGoogleLogging("infosun");
+	FLAGS_minloglevel = loglevel;
 	FLAGS_colorlogtostderr = true;  // Set log color
 	FLAGS_logbufsecs = 0;  // Set log output speed(s)
 	FLAGS_max_log_size = 1024;  // Set max log file size
@@ -74,7 +75,7 @@ int main(int argc, char const *argv[])
 
     ReactorInst.startReactorWithThread();
     BussinessTCP.startTCPServer(&ReactorInst,strIP.c_str(),Port);
-
+	LOG(INFO)<<"start tcp server";
     //×¢²áfsÊÂ¼þÏìÓ¦¡£
     FSprocess FSprocessInst;
 	FSprocessInst.Initability();
