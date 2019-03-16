@@ -24,15 +24,15 @@ int main(int argc, char const *argv[])
     bool bSuccess = false;
 
     db_operator_t::initDatabase();
-    db_operator_t::SelectSql(FSprocess::m_gKeymap, 2);
-    db_operator_t::GetKnowledge(FSprocess::m_knowledgeSet,2);
-    map<uint32_t, base_script_t>::iterator strmap_iter = FSprocess::m_gKeymap.begin();
+    db_operator_t::SelectSqlAllSC(FSprocess::m_gKeymap);
+    db_operator_t::GetKnowledge(FSprocess::m_knowledgeSet);
+    map<string, base_script_t>::iterator strmap_iter = FSprocess::m_gKeymap.begin();
     for (; strmap_iter != FSprocess::m_gKeymap.end(); strmap_iter++)
     {
         // cout << strmap_iter->first << ' ' << strmap_iter->second << endl;
         base_script_t node=strmap_iter->second;
         // codeHelper::GetInstance()->run(node.vox_base.c_str(), node.desc.c_str());
-        printf("node==%d,descript=%s\n", strmap_iter->first,node.desc.c_str());
+        printf("node==%s,descript=%s\n", strmap_iter->first,node.desc.c_str());
 
     }
     //Æô¶¯tcp·þÎñ

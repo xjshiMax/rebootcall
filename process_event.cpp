@@ -203,9 +203,11 @@ void FSsession::Onanswar()
 	esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
 	esl_send_recv_timed(handle, tmp_cmd, 1000);
 	this->m_DB_recording_file= filename;
-	map<uint32_t, base_script_t>::iterator iter; //=keymap.find(1);
-	map<uint32_t, base_script_t> nodeMap = FSprocess::m_gKeymap;
-	iter = nodeMap.find(1);
+	map<string, base_script_t>::iterator iter; //=keymap.find(1);
+	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
+	char strSCID[32]={0};
+	sprintf(strSCID,"%s_%d",m_speeckCraftID.c_str(),nodeState);
+	iter = nodeMap.find(strSCID);
 	if (iter != nodeMap.end())
 	{
 		base_script_t node = iter->second;
@@ -219,7 +221,7 @@ void FSsession::Onanswar()
 void FSsession::Action()
 {
 	string event_subclass, contact, from_user;
-	map<uint32_t, base_script_t> nodeMap = FSprocess::m_gKeymap;
+	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	vector<base_knowledge_t> knowledgeset=FSprocess::m_knowledgeSet;
 	string a_uuid=GetSessionID();
 	char tmp_cmd[1024] = {0};
@@ -276,10 +278,13 @@ void FSsession::Action()
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
 				string asrText=asrParstText;
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
-				map<uint32_t, base_script_t>::iterator tempiter = nodeMap.find(nodeState);
+				char strSCID[32]={0};
+				sprintf(strSCID,"%s_%d",m_speeckCraftID.c_str(),nodeState);
+				map<string, base_script_t>::iterator tempiter = nodeMap.find(strSCID);
+				if(tempiter==nodeMap.end()) return;
 				string keywordText = tempiter->second.userWord;
-				esl_log(ESL_LOG_INFO, "current nodestatus:%d,Result is keyword :%s\n", nodeState,keywordText.c_str());
-				LOG(INFO)<<"current nodestatus:"<<nodeState<<" Result is keyword:"<<keywordText;
+				esl_log(ESL_LOG_INFO, "current nodestatus:%s,Result is keyword :%s\n", strSCID,keywordText.c_str());
+				LOG(INFO)<<"current nodestatus:"<<strSCID<<" Result is keyword:"<<keywordText;
 				char setVar[200];
 			//	snprintf(setVar, sizeof setVar, "node_state=%d", it->first);
 				vector<base_knowledge_t>::iterator knowledgeite=knowledgeset.begin();
@@ -288,6 +293,10 @@ void FSsession::Action()
 				bool b_getknow_path=false;
 				while(knowledgeite!=knowledgeset.end())
 				{
+					if(knowledgeite->voice_version_id!=atoi(m_speeckCraftID.c_str()))
+					{
+						continue;
+					}
 					string strwork=knowledgeite->keyword;
 					while(strwork!="")//需要分割解析
 					{
@@ -389,8 +398,9 @@ void FSsession::Action()
 					}
 
 				}//switch
-				map<uint32_t, base_script_t>::iterator iter;
-				iter = nodeMap.find(nodeState);
+				char strcmdSCID[32]={0};
+				sprintf(strcmdSCID,"%s_%d",m_speeckCraftID.c_str(),nodeState);
+				map<string, base_script_t>::iterator iter= nodeMap.find(strcmdSCID);
 				if (iter != nodeMap.end())
 				{
 					base_script_t node = iter->second;
@@ -831,7 +841,7 @@ void FScallManager::CheckEndCall()
 		}
 	}
 }
-map<uint32_t, base_script_t> FSprocess::m_gKeymap;
+map<string, base_script_t> FSprocess::m_gKeymap;
 vector<base_knowledge_t>FSprocess::m_knowledgeSet;
 map<string,FSsession*> FSprocess::m_SessionSet;
 esl_handle_t* FSprocess::m_sessionHandle=NULL;
@@ -997,7 +1007,7 @@ void *FSprocess::Inbound_Init(void *arg)
 
 void FSprocess::process_event(esl_handle_t *handle,
 				   esl_event_t *event,
-				   const map<uint32_t, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
+				   const map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
 {
 	char tmp_cmd[1024] = {0};
 	string strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";

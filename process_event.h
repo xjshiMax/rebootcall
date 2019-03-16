@@ -137,12 +137,12 @@ public:
 	static void *test_Process(void *arg);
 	void  process_event(esl_handle_t *handle,
 				   esl_event_t *event,
-				   const map<uint32_t,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
+				   const map<string,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
 	static esl_handle_t* getSessionhandle(){return m_sessionHandle;}
 	FSsession* GetSessionbychannelid(string channel);
 	FSsession*GetSessionbymainUUID(string strmainid);
 
-	static map<uint32_t, base_script_t> m_gKeymap;
+	static map<string, base_script_t> m_gKeymap;
 	static vector<base_knowledge_t>m_knowledgeSet;
 //xthreadPool SessionPool;
 	static map<string,FSsession*> m_SessionSet;

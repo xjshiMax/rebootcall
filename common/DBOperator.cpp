@@ -67,7 +67,57 @@ bool db_operator_t::SelectSql(map<uint32_t,base_script_t>& vSpeech,int32_t voice
 
     return nSuccess;
 }
-bool db_operator_t::GetKnowledge(vector<base_knowledge_t>&knowledgelib,int32_t voiceVer)
+//读取全部的话术
+bool db_operator_t::SelectSqlAllSC(map<string,base_script_t>& vSpeech)
+{
+	int nSuccess = 0;
+
+	Statement *state;
+	Connection *cmd;
+	ResultSet *result;
+	try
+	{
+		cmd = DBPool::GetInstance()->GetConnection();
+		if (cmd == NULL)
+		{
+			printf("Connection *cmd = dbIn==NULL....\n");
+		}
+
+		state = cmd->createStatement();
+		state->execute("use txacall");
+
+
+		char query[256] = {0};
+		sprintf(query, "select * from ivr_node_flow_tbl ");
+
+		result = state->executeQuery(query);
+		base_script_t node;
+		while (result->next())
+		{
+			node.voice_version_id = result->getInt("voice_version_id");
+			node.type = result->getInt("type");
+			node.nodeId = result->getInt("node_id");
+			node.desc = result->getString("descript");
+			node.userWord = result->getString("user_word");
+			node.vox_base = result->getString("recordfile");
+			node.taskId = result->getInt("task_id");
+			char strnodeID[32];
+			sprintf(strnodeID,"%d_%d",node.voice_version_id,node.nodeId);
+			vSpeech.insert(pair<string, base_script_t>(strnodeID, node));
+		}
+	}
+	catch (sql::SQLException &ex)
+	{
+		printf("SelectSql error:%s\n", ex.what());
+		nSuccess = -1;
+	}
+	delete result;
+	delete state;
+	DBPool::GetInstance()->ReleaseConnection(cmd);
+
+	return nSuccess;
+}
+bool db_operator_t::GetKnowledge(vector<base_knowledge_t>&knowledgelib)
 {
 	int nSuccess = 0;
 
