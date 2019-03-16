@@ -137,7 +137,7 @@ bool db_operator_t::GetKnowledge(vector<base_knowledge_t>&knowledgelib)
 
 
 		char query[256] = {0};
-		sprintf(query, "select * from knowledge_base_tbl where voice_version_id='%d'", voiceVer);
+		sprintf(query, "select * from knowledge_base_tbl ");
 
 		result = state->executeQuery(query);
 		base_knowledge_t node;

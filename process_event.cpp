@@ -588,7 +588,9 @@ void FSsession::Action()
 		{
 			esl_log(ESL_LOG_INFO, "CALL IN ESL_EVENT_PLAYBACK_STOP %s\n", strUUID.c_str());
 		}
-		map<uint32_t, base_script_t>::iterator iter = nodeMap.find(nodeState);
+		char strSCID[32]={0};
+		sprintf(strSCID,"%s_%d",m_speeckCraftID.c_str(),nodeState);
+		map<string, base_script_t>::iterator iter = nodeMap.find(strSCID);
 		string keyword = iter->second.userWord;
 		//m_IsAsr=true;
 

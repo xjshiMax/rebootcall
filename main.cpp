@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
         // cout << strmap_iter->first << ' ' << strmap_iter->second << endl;
         base_script_t node=strmap_iter->second;
         // codeHelper::GetInstance()->run(node.vox_base.c_str(), node.desc.c_str());
-        printf("node==%s,descript=%s\n", strmap_iter->first,node.desc.c_str());
+        printf("node==%s,descript=%s\n", strmap_iter->first.c_str(),node.desc.c_str());
 
     }
     //Æô¶¯tcp·þÎñ
