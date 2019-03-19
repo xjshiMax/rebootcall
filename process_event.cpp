@@ -142,7 +142,7 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 					strwork="";
 				}
 			}//while #
-		}
+		}//in_tab
 // 		else if(strkey.find("tab_yes")!=string::npos)
 // 		{
 // 			if(checked)
@@ -175,6 +175,12 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 // 				return nodeNum;
 // 			}
 // 		}
+		else if(strkey.find("bot_tab")!=string::npos)// 兜底的分支
+		{
+			cJSON_Delete(root);
+			esl_log(ESL_LOG_INFO,"bot_tab,node=%d\n",nodeNum);
+			return nodeNum;
+		}
 		else
 		{
 			esl_log(ESL_LOG_INFO,"can not match any ,SC_Bye,node=5\n");
@@ -335,9 +341,12 @@ void FSsession::Action()
 					if(b_getknow_path)break;
 					knowledgeite++;
 				}
-				if(!nextstate&&keywordText!="")
+				if(nextstate!=SC_KnowledgeLib)
 				{
-					nextstate=Getnextstatus(asrText,keywordText);
+					if(keywordText!="")
+						nextstate=Getnextstatus(asrText,keywordText);
+					else
+						nextstate=SC_Hungup;
 				}
 				switch(nextstate)
 				{
@@ -396,6 +405,9 @@ void FSsession::Action()
 						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
 						return;
 					}
+				default:
+					nodeState = nextstate;
+					break;
 
 				}//switch
 				char strcmdSCID[32]={0};
@@ -411,17 +423,22 @@ void FSsession::Action()
 					m_DB_talk_times+=1;
 					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
 					LOG(INFO)<<"playback the answar ,nodeState:"<<nodeState;
+					if(node.userWord=="")
+					{
+						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
+						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+					}
 				//	return;
 				}
 				else
 				{
 					esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
 				}
-				if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
-				{
-					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
-					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-				}
+// 				if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
+// 				{
+// 					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
+// 					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+// 				}
 				m_IsAsr=true;
 				return;
 			}//m_IsAsr
