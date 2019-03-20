@@ -33,7 +33,7 @@ class FSprocess;
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("B"){}
+		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""){}
 		virtual int run();
 		void Action();
 		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
@@ -46,7 +46,9 @@ class FSsession:public xtaskbase
 		void Onanswar();
 		int Getnextstatus(string asrtext,string keyword);
 		void ChangetheTypeCount(string strtype);
-		void SetFinnallabel();
+		void SetFinnallabel(int currentstatus,int nextstatus);
+		void collection(string name,string Text);
+
 	public:
 		esl_handle_t *handle;
 		esl_event_t *event;
@@ -74,6 +76,10 @@ class FSsession:public xtaskbase
 		int m_Atimes;
 		int m_Btimes;
 		int m_Ctimes;
+		bool m_bhaveset;
+		string m_SessionWord;	//记录客户
+		string m_username;
+		Mutex m_databaselock;
 };
 /* 发送fs批量呼叫请求 one-task-one-thread*/
 class FScall:public Threadbase
@@ -102,7 +108,7 @@ public:
 	string m_fsip;
 	int m_fsPort;
 	string m_fsPassword;
-	std::vector<string>m_NumberSet;
+	std::vector<t_Userinfo>m_NumberSet;
 	static FScall*Instance();
 	static FScall*m_inst;
 	bool m_IsAllend;		//电话号码全部拨打完毕
@@ -132,12 +138,12 @@ public:
 	}
 	void Initability();
 	virtual void run();
-	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname);
+	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username);
 	void *Inbound_Init(void *arg);
 	static void *test_Process(void *arg);
 	void  process_event(esl_handle_t *handle,
 				   esl_event_t *event,
-				   const map<string,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
+				   map<string,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
 	static esl_handle_t* getSessionhandle(){return m_sessionHandle;}
 	FSsession* GetSessionbychannelid(string channel);
 	FSsession*GetSessionbymainUUID(string strmainid);
@@ -151,5 +157,6 @@ public:
 	string m_fsip;
 	int m_fsPort;
 	string m_fsPassword;
+	static string m_recordPath;
 };
 

@@ -33,4 +33,8 @@ typedef struct base_knowledge{
 	uint32_t taskId;
 }base_knowledge_t;
 
+typedef struct{
+	string username;
+	string phonenum;
+}t_Userinfo;
 #endif

@@ -8,7 +8,7 @@
 using namespace std;
 #define _Use_ALI_SDK
 typedef enum{
-	SC_Opening_Remarks=1,
+	SC_Opening_Remarks=1000,
 	SC_Add_In_Wechat,
 	SC_Additive_Group,
 	SC_Add_Back_Wechat,
@@ -24,6 +24,7 @@ int FSsession::run()
 }
 void FSsession::ChangetheTypeCount(string strtype)
 {
+#ifdef _GUPIAO
 	if(strtype=="A")
 	{
 		m_Atimes++;
@@ -36,24 +37,37 @@ void FSsession::ChangetheTypeCount(string strtype)
 	{
 		m_Ctimes++;
 	}
+#endif
 }
-void FSsession::SetFinnallabel()
+void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 {
-	LOG(INFO)<<"nodeState:"<<nodeState<<", m_Atimes:"<<m_Atimes<<"m_Ctimes:"<<m_Ctimes<<" m_Btimes"<<m_Btimes;
-	if(nodeState==SC_Add_Back_Wechat||(m_Atimes>=2&&m_Ctimes==0)) //命中两个A类关键字
-	{
+	if(m_bhaveset)
+		return;
+	if(nextstatus==18)//您是我们特别邀请的尊贵用户，享有快速服务通道
 		m_DB_outbound_label="A";
-	}
-	else if(m_Ctimes>=1)
-	{
-		m_DB_outbound_label="C";
-	}
-	else if(m_Btimes>=1)
-	{
+	else if(currentstatus>1&&nextstatus==10)
 		m_DB_outbound_label="B";
-	}
-	else
+	else if(nextstatus==4)
+		m_DB_outbound_label="C";
+	else if(nextstatus==3||(currentstatus==1&&nextstatus==10))
+	{
 		m_DB_outbound_label="D";
+	}
+	else if(currentstatus==8&&nextstatus==12)
+	{
+		m_DB_outbound_label="E";
+	}
+	else if(nextstatus==6)
+	{
+		m_DB_outbound_label="F";
+	}
+
+}
+void FSsession::collection(string name,string Text)
+{
+	m_SessionWord+=name+": ";
+	m_SessionWord+=Text;
+	m_SessionWord+="\r\n";
 }
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
@@ -199,16 +213,18 @@ void FSsession::Onanswar()
 	struct tm *tblock;
 	time_t timer = time(NULL);
 	char strtime[64]={0};
+	char onlyfilename[64]={0};
 	tblock = localtime(&timer);
 	sprintf(strtime,"%04d%02d%02d%02d%02d%02d",tblock->tm_year+1900,tblock->tm_mon+1,tblock->tm_mday,tblock->tm_hour,tblock->tm_min,tblock->tm_sec);
-	sprintf(filename,"%s/%s_%s.wav",recordpath.c_str(),caller_id.c_str(),strtime);
+	sprintf(onlyfilename,"%s_%s.wav",caller_id.c_str(),strtime);
+	sprintf(filename,"%s/%s",recordpath.c_str(),onlyfilename);
 	//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
 	esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
 	sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
 	//sprintf(tmp_cmd, "api uuid_record %s start %s 9999 \n\n", strUUID.c_str(),filename);
 	esl_log(ESL_LOG_INFO, "esl_send_recv cmd: %s\n", tmp_cmd);
 	esl_send_recv_timed(handle, tmp_cmd, 1000);
-	this->m_DB_recording_file= filename;
+	this->m_DB_recording_file= onlyfilename;
 	map<string, base_script_t>::iterator iter; //=keymap.find(1);
 	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	char strSCID[32]={0};
@@ -220,6 +236,7 @@ void FSsession::Onanswar()
 		node.vox_base += ".wav";
 		esl_execute(handle, "set", "node_state=1", strUUID.c_str());
 		playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+		collection("机器人",node.desc);
 
 	}
 }
@@ -282,6 +299,7 @@ void FSsession::Action()
 			{
 				m_IsAsr=false;
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
+				collection("客户",asrResp);
 				string asrText=asrParstText;
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
 				char strSCID[32]={0};
@@ -301,6 +319,7 @@ void FSsession::Action()
 				{
 					if(knowledgeite->voice_version_id!=atoi(m_speeckCraftID.c_str()))
 					{
+						knowledgeite++;
 						continue;
 					}
 					string strwork=knowledgeite->keyword;
@@ -309,6 +328,11 @@ void FSsession::Action()
 						size_t pos = strwork.find("#");
 						if(pos != std::string::npos)
 						{
+							if(pos==0&&pos+1<=strwork.length())
+							{
+								strwork=strwork.substr(pos+1);
+								continue;
+							}
 							std::string x = strwork.substr(0,pos);
 							if(asrText.find(x)!=std::string::npos)
 							{
@@ -316,6 +340,7 @@ void FSsession::Action()
 								esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
 								nextstate=SC_KnowledgeLib;
 								know_path=knowledgeite->record;
+								collection("知识库",knowledgeite->desc);
 								b_getknow_path=true;
 								break;
 							}
@@ -331,6 +356,7 @@ void FSsession::Action()
 									esl_log(ESL_LOG_INFO,"hit knowledge lib:%s",tempkeyword.c_str());
 									nextstate=SC_KnowledgeLib;
 									know_path=knowledgeite->record;
+									collection("知识库",knowledgeite->desc);
 									b_getknow_path=true;
 									break;
 								}
@@ -341,6 +367,7 @@ void FSsession::Action()
 					if(b_getknow_path)break;
 					knowledgeite++;
 				}
+			
 				if(nextstate!=SC_KnowledgeLib)
 				{
 					if(keywordText!="")
@@ -348,6 +375,7 @@ void FSsession::Action()
 					else
 						nextstate=SC_Hungup;
 				}
+				SetFinnallabel(nodeState,nextstate);
 				switch(nextstate)
 				{
 				case SC_Opening_Remarks:
@@ -394,6 +422,7 @@ void FSsession::Action()
 						esl_status_t t=esl_execute(handle, "playback", know_path.c_str(), a_uuid.c_str());
 						m_DB_talk_times+=1;
 						esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
+						sleep(1);
 						m_IsAsr=true;
 						return ;
 					}
@@ -420,14 +449,15 @@ void FSsession::Action()
 					printf("100 stop_asr uuid:%s",strUUID.c_str());
 					esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
+					collection("机器人",node.desc);
 					m_DB_talk_times+=1;
 					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
 					LOG(INFO)<<"playback the answar ,nodeState:"<<nodeState;
-					if(node.userWord=="")
-					{
-						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
-						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-					}
+// 					if(node.userWord=="")
+// 					{
+// 						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
+// 						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+// 					}
 				//	return;
 				}
 				else
@@ -595,6 +625,7 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_PLAYBACK_STOP:
 	{
+		//m_IsAsr=true;
 		//????????????
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
@@ -607,14 +638,18 @@ void FSsession::Action()
 		}
 		char strSCID[32]={0};
 		sprintf(strSCID,"%s_%d",m_speeckCraftID.c_str(),nodeState);
+		//string strscid=strSCID;
 		map<string, base_script_t>::iterator iter = nodeMap.find(strSCID);
-		string keyword = iter->second.userWord;
-		//m_IsAsr=true;
-
-		if (keyword.empty())
+		if(iter!=nodeMap.end())
 		{
-			esl_log(ESL_LOG_INFO, "handup Result is keyword :%s\n", keyword.c_str());
-			esl_execute(handle, "hangup", NULL, strUUID.c_str());
+			string keyword = iter->second.userWord;
+			//m_IsAsr=true;
+
+			if (keyword.empty())
+			{
+				esl_log(ESL_LOG_INFO, "handup Result is keyword :%s\n", keyword.c_str());
+				esl_execute(handle, "hangup", NULL, strUUID.c_str());
+			}
 		}
 
 		break;
@@ -675,13 +710,14 @@ void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string u
 }
 void FSsession::InsertSessionResult()
 {
-	SetFinnallabel();
-	char querysql[512]={0};
-	string strsql="Insert into call_cdr_tbl (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at)values ";
-	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d)",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
-		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at);
+	//SetFinnallabel();
+	char querysql[4096]={0};
+	string strsql="Insert into call_cdr_tbl (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at,username,sessiontext)values ";
+	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d,'%s','%s')",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
+		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at,m_username.c_str(),m_SessionWord.c_str());
 	esl_log(ESL_LOG_INFO,"insert the session redcord:%s\n",querysql);
 	//db_operator_t::initDatabase();
+	//m_databaselock.lock();
 	db_operator_t::InsertSessionRe(querysql);
 }
 string FSsession::Getcurrenttime()
@@ -699,17 +735,17 @@ int FSsession::GetUTCtimestamp()
 }
 string FSsession::Getrecordpath()
 {
-	string rootpath="/home/records";
-	string currenttime=Getcurrenttime();
-	currenttime=currenttime.erase(currenttime.find_first_of(" "));
-	string recordpath=rootpath+"/"+currenttime;
-	if(access(recordpath.c_str(),F_OK)==0) //存在直接返回
-		return recordpath;
-	else									//不存在则创建
-	{
-		mkdir(recordpath.c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); 
-	}
-	return recordpath;
+	string rootpath=FSprocess::m_recordPath;
+// 	string currenttime=Getcurrenttime();
+// 	currenttime=currenttime.erase(currenttime.find_first_of(" "));
+// 	string recordpath=rootpath+"/"+currenttime;
+// 	if(access(recordpath.c_str(),F_OK)==0) //存在直接返回
+// 		return recordpath;
+// 	else									//不存在则创建
+// 	{
+// 		mkdir(recordpath.c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); 
+// 	}
+	return FSprocess::m_recordPath;
 }
 void FScall::run()
 {
@@ -813,11 +849,11 @@ int FScall::LauchFScall()
 	//esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}user/1006 &park()");
     //esl_send_recv(&handle, "bgapi originate user/1003 &park()");
 	char callCmd[256];
-	vector<string>::iterator ite=m_NumberSet.begin();
+	vector<t_Userinfo>::iterator ite=m_NumberSet.begin();
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
 	while(ite!=m_NumberSet.end())
 	{
-		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}sofia/gateway/ingw/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
+		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);
@@ -864,6 +900,7 @@ map<string, base_script_t> FSprocess::m_gKeymap;
 vector<base_knowledge_t>FSprocess::m_knowledgeSet;
 map<string,FSsession*> FSprocess::m_SessionSet;
 esl_handle_t* FSprocess::m_sessionHandle=NULL;
+string FSprocess::m_recordPath="/home/path";
 void FSprocess::Initability()
 {
 	IniFile IniService;
@@ -886,13 +923,18 @@ void FSprocess::Initability()
 	{
 		m_fsPassword="ClueCon";
 	}
+	string recordpath=IniService.getStringValue("RECORDPATH","path",iret);
+	if(iret==0)
+	{
+		m_recordPath=recordpath;
+	}
 	iret=-1;
 }
 void FSprocess::run()
 {
 	Inbound_Init((void*)"userinfo");
 }
-FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname)
+FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username)
 {
 	FSsession* psession=new FSsession;
 	psession->m_taskID=strtaskID;
@@ -907,6 +949,7 @@ FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,stri
 	psession->m_DB_creatd_at = psession->GetUTCtimestamp();
 	psession->m_DB_start_stamp=psession->Getcurrenttime();
 	psession->m_DB_updated_at=0;
+	psession->m_username=username;
 	return psession;
 }
 FSsession* FSprocess::GetSessionbychannelid(string channel)
@@ -978,6 +1021,7 @@ void *FSprocess::Inbound_Init(void *arg)
         {
             process_event(&handle, handle.last_ievent, m_gKeymap,m_knowledgeSet);
         }
+		//esl_log(ESL_LOG_INFO,"status=%d,--------\n",status);
     }
 	esl_log(ESL_LOG_INFO,"status=%d,--------\n",status);
     esl_disconnect(&handle);
@@ -1026,7 +1070,7 @@ void *FSprocess::Inbound_Init(void *arg)
 
 void FSprocess::process_event(esl_handle_t *handle,
 				   esl_event_t *event,
-				   const map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
+				    map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
 {
 	char tmp_cmd[1024] = {0};
 	string strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
@@ -1036,6 +1080,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
 	string strtaskname=esl_event_get_header(event, "Variable_taskname") ? esl_event_get_header(event, "Variable_taskname") : "";
 	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
+	string strusername=esl_event_get_header(event, "Variable_username") ? esl_event_get_header(event, "Variable_username") : "";
 	//string strmainUUID=esl_event_get_header(event, "Variable_mainUUID") ? esl_event_get_header(event, "Variable_mainUUID") : "";
 	//printf("strscraftID:%s\n",strscraftID.c_str());
 // 	if(strUUID=="")
@@ -1082,7 +1127,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 			{
 				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER call in uuid:%s \n", strUUID.c_str());
 			}
-			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname);
+			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname,strusername);
 			if(psession==NULL)
 			{
 				esl_log(ESL_LOG_INFO,"CreateSession failed\n");
@@ -1100,7 +1145,8 @@ void FSprocess::process_event(esl_handle_t *handle,
 			psession->handle=handle;
 			psession->event=event;
 			psession->Onanswar();
-			esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
+			esl_status_t t = esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
+			esl_log(ESL_LOG_INFO, "start_asr:%d \n", t);
 		}
 		break;
 	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
@@ -1127,7 +1173,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 				LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
 			}
 			//LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
-			esl_log(ESL_LOG_INFO, "after destory session, uuid:%s,m_SessionSet.size()=%d \n",  strUUID.c_str(),m_SessionSet.size());
+			//esl_log(ESL_LOG_INFO, "after destory session, uuid:%s,m_SessionSet.size()=%d \n",  strUUID.c_str(),m_SessionSet.size());
 		}
 		break;
 	default:
