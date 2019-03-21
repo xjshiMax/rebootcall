@@ -765,6 +765,11 @@ void FScall::Initability()
 		m_fsPassword="ClueCon";
 	}
 	iret=-1;
+	m_gateway=IniService.getStringValue("FREESWITCH","GATEWAY",iret);
+	if(iret!=0)
+	{
+		m_gateway="ingw";
+	}
 }
 FScall*FScall::Instance()
 {
@@ -837,7 +842,7 @@ int FScall::LauchFScall()
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
 	while(ite!=m_NumberSet.end())
 	{
-		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/%s/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),m_gateway.c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);

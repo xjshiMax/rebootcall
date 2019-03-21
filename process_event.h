@@ -111,6 +111,7 @@ public:
 	static FScall*Instance();
 	static FScall*m_inst;
 	bool m_IsAllend;		//电话号码全部拨打完毕
+	string m_gateway;
 };
 //管理通话任务类
 class FScallManager
