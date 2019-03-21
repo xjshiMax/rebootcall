@@ -12,8 +12,9 @@ class db_operator_t {
 public:
     static bool initDatabase();
     static bool SelectSql(map<uint32_t,base_script_t>& vSpeech,int32_t voiceVer);
-	static bool GetKnowledge(vector<base_knowledge_t>&knowledgelib,int32_t voiceVer);
-	static bool GetnumberList(vector<string>&numberlist,string taskid);
+	static bool SelectSqlAllSC(map<string,base_script_t>& vSpeech);
+	static bool GetKnowledge(vector<base_knowledge_t>&knowledgelib);
+	static bool GetnumberList(vector<t_Userinfo>&numberlist,string taskid);
 	static bool InsertSessionRe(string insertsql);
 
 };
