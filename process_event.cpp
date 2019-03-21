@@ -423,7 +423,7 @@ void FSsession::Action()
 						m_DB_talk_times+=1;
 						esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
 						sleep(1);
-						m_IsAsr=true;
+						//m_IsAsr=true;
 						return ;
 					}
 				case SC_Hungup:
@@ -469,7 +469,7 @@ void FSsession::Action()
 // 					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
 // 					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
 // 				}
-				m_IsAsr=true;
+				//m_IsAsr=true;
 				return;
 			}//m_IsAsr
 			}//asr
@@ -625,7 +625,7 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_PLAYBACK_STOP:
 	{
-		//m_IsAsr=true;
+		m_IsAsr=true;
 		//????????????
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
@@ -703,7 +703,7 @@ void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string u
 	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
 	// esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
 	//esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", uuid.c_str());
-	m_IsAsr=true;
+	//m_IsAsr=true;
 	//sleep(10);
 	//esl_execute(handle, "stop_asr", NULL, uuid.c_str());
 
