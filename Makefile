@@ -13,8 +13,8 @@ SRC= main.cpp TXTCPServer.cpp process_event.cpp \
 	./esl/esl_json.c ./esl/esl_threadmutex.c \
 	./esl/esl_buffer.c ./esl/esl_event.c ./esl/esl_config.c
 	
-target:txcall
-txcall:$(SRC)
+target:gf_txcall
+gf_txcall:$(SRC)
 	$(CC) -o $@ $^ $(INCLUDE) $(CFLAGS) $(LIBS) 
 
 clean:
