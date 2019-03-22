@@ -16,7 +16,10 @@ public:
 	static bool GetKnowledge(vector<base_knowledge_t>&knowledgelib);
 	static bool GetnumberList(vector<t_Userinfo>&numberlist,string taskid);
 	static bool InsertSessionRe(string insertsql);
-
+	static string m_ivr_node_flow_tbl;
+	static string m_knowledge_base_tbl;
+	static string m_ai_callout_tbl;
+	static string m_call_cdr_tbl;
 };
 
 #endif

@@ -6,6 +6,10 @@
 using namespace inifile;
 using namespace SAEBASE;
 Mutex _databaselock;
+string db_operator_t::m_ivr_node_flow_tbl="ivr_node_flow_tbl";
+string db_operator_t::m_knowledge_base_tbl="knowledge_base_tbl";
+string db_operator_t::m_ai_callout_tbl="ai_callout_tbl";
+string db_operator_t::m_call_cdr_tbl="call_cdr_tbl";
 bool db_operator_t::initDatabase()
 {
 	//bool bRes = false;
@@ -22,6 +26,10 @@ bool db_operator_t::initDatabase()
 	string servername=IniService.getStringValue("database","servername",iret);
 	string username=IniService.getStringValue("database","username",iret);
 	string password=IniService.getStringValue("database","password",iret);
+	m_ivr_node_flow_tbl=IniService.getStringValue("datatable","ivr_node_flow_tbl",iret);
+	m_knowledge_base_tbl=IniService.getStringValue("datatable","knowledge_base_tbl",iret);
+	m_ai_callout_tbl=IniService.getStringValue("datatable","ai_callout_tbl",iret);
+	m_call_cdr_tbl=IniService.getStringValue("datatable","m_call_cdr_tbl",iret);
     DBPool::GetInstance()->initPool(servername.c_str(), username.c_str(), password.c_str(), 20);
     return true;
 
@@ -47,7 +55,7 @@ bool db_operator_t::SelectSql(map<uint32_t,base_script_t>& vSpeech,int32_t voice
 
 
         char query[256] = {0};
-        sprintf(query, "select * from ivr_node_flow_tbl where voice_version_id='%d'", voiceVer);
+        sprintf(query, "select * from %s where voice_version_id='%d'",m_ivr_node_flow_tbl.c_str(), voiceVer);
 
         result = state->executeQuery(query);
         base_script_t node;
@@ -95,7 +103,7 @@ bool db_operator_t::SelectSqlAllSC(map<string,base_script_t>& vSpeech)
 
 
 		char query[256] = {0};
-		sprintf(query, "select * from ivr_node_flow_tbl ");
+		sprintf(query, "select * from %s ",m_ivr_node_flow_tbl.c_str());
 
 		result = state->executeQuery(query);
 		base_script_t node;
@@ -144,7 +152,7 @@ bool db_operator_t::GetKnowledge(vector<base_knowledge_t>&knowledgelib)
 
 
 		char query[256] = {0};
-		sprintf(query, "select * from knowledge_base_tbl ");
+		sprintf(query, "select * from %s ",m_knowledge_base_tbl.c_str());
 
 		result = state->executeQuery(query);
 		base_knowledge_t node;
@@ -192,7 +200,7 @@ bool db_operator_t::GetnumberList(vector<t_Userinfo>&numberlist,string taskid)
 
 
 		char query[256] = {0};
-		sprintf(query, "select * from ai_callout_tbl where task_id='%s'", taskid.c_str());
+		sprintf(query, "select * from %s where task_id='%s'",m_ai_callout_tbl.c_str(), taskid.c_str());
 		//string query="select * from call_car_tbl where task_id='"
 		result = state->executeQuery(query);
 		string node;

@@ -697,7 +697,7 @@ void FSsession::InsertSessionResult()
 {
 	SetFinnallabel();
 	char querysql[4096]={0};
-	string strsql="Insert into call_cdr_tbl (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at)values ";
+	string strsql="Insert into "+db_operator_t::m_call_cdr_tbl+" (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at)values ";
 	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d,'%s','%s')",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
 		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at);
 	esl_log(ESL_LOG_INFO,"insert the session redcord:%s\n",querysql);
