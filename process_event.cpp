@@ -63,14 +63,30 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 	}
 
 }
-void FSsession::collection(string name,string Text)
+void FSsession::collection(string name,string Text,int node)
 {
 	m_SessionWord+=name+": ";
 	m_SessionWord+=Text;
 	m_SessionWord+="\r\n";
+	if(node!=-1)
+		m_nodelist.push_back(node);
 }
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
+	if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
+	{
+		m_SessionState=GF_normal_node;
+		int listsize=m_nodelist.size();
+		if(listsize>=2)
+			return m_nodelist[listsize-2];
+	}
+	else if((m_SessionState&GF_knowledge_node)&&(!(m_SessionState&GF_nothear)))
+	{
+		m_SessionState=GF_normal_node;
+		int listsize=m_nodelist.size();
+		if(listsize>=1)
+			return m_nodelist[listsize-1];
+	}
 	cJSON *root = cJSON_Parse(keyword.c_str());
 	if(!root) //如果解析失败，直接返回到 SC_Contect_nextTime
 	{
@@ -236,7 +252,7 @@ void FSsession::Onanswar()
 		node.vox_base += ".wav";
 		esl_execute(handle, "set", "node_state=1", strUUID.c_str());
 		playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
-		collection("机器人",node.desc);
+		collection("机器人",node.desc,nodeState);
 
 	}
 }
@@ -375,6 +391,10 @@ void FSsession::Action()
 					else
 						nextstate=SC_Hungup;
 				}
+				else
+				{
+					m_SessionState|=GF_knowledge_node;
+				}
 				SetFinnallabel(nodeState,nextstate);
 				switch(nextstate)
 				{
@@ -449,7 +469,9 @@ void FSsession::Action()
 					printf("100 stop_asr uuid:%s",strUUID.c_str());
 					esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
-					collection("机器人",node.desc);
+					collection("机器人",node.desc,nodeState);
+					if(nodeState==8||nodeState==21||nodeState==22||nodeState==23||nodeState==24||nodeState==25||nodeState==26||nodeState==27)
+						m_SessionState|=GF_nothear;
 					m_DB_talk_times+=1;
 					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
 					LOG(INFO)<<"playback the answar ,nodeState:"<<nodeState;
@@ -853,7 +875,7 @@ int FScall::LauchFScall()
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
 	while(ite!=m_NumberSet.end())
 	{
-		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);

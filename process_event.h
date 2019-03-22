@@ -28,12 +28,19 @@ using namespace inifile;
 using namespace SAEBASE;
 
 //map<uint32_t, base_script_t> gKeymap;
+typedef enum
+{
+	GF_normal_node=0x00,
+	GF_knowledge_node=0x01,  //命中知识库
+	GF_nothear=0x02,		//听不清
+
+};
 class FSprocess;
 /* 与fs之间的通信*/
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""){}
+		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node){}
 		virtual int run();
 		void Action();
 		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
@@ -47,7 +54,7 @@ class FSsession:public xtaskbase
 		int Getnextstatus(string asrtext,string keyword);
 		void ChangetheTypeCount(string strtype);
 		void SetFinnallabel(int currentstatus,int nextstatus);
-		void collection(string name,string Text);
+		void collection(string name,string Text,int nodeState=-1);
 
 	public:
 		esl_handle_t *handle;
@@ -80,6 +87,8 @@ class FSsession:public xtaskbase
 		string m_SessionWord;	//记录客户
 		string m_username;
 		Mutex m_databaselock;
+		int m_SessionState;		//会话状态，正常节点还是知识库和没听清
+		vector<int> m_nodelist;			//记录关键字命中节点，不记录知识库
 };
 /* 发送fs批量呼叫请求 one-task-one-thread*/
 class FScall:public Threadbase
