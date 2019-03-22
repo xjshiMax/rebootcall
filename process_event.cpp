@@ -45,15 +45,15 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 		return;
 	if(nextstatus==18)//您是我们特别邀请的尊贵用户，享有快速服务通道
 		m_DB_outbound_label="A";
-	else if(currentstatus==1&&nextstatus==5)
+	else if((currentstatus==1&&nextstatus==5)||(currentstatus==2&&nextstatus==5))
 		m_DB_outbound_label="B";
-	else if(nextstatus==15||nextstatus==17)
+	else if((currentstatus==16&&nextstatus==15)||nextstatus==17)
 		m_DB_outbound_label="C";
-	else if((currentstatus==3&&nextstatus==10))
+	else if((currentstatus==3&&nextstatus==10)||(currentstatus==14&&nextstatus==10)||(currentstatus==24&&nextstatus==10))
 	{
 		m_DB_outbound_label="D";
 	}
-	else if(currentstatus==8&&nextstatus==12)
+	else if((currentstatus==8&&nextstatus==12)||(currentstatus==24&&nextstatus==12))
 	{
 		m_DB_outbound_label="E";
 	}
@@ -61,7 +61,7 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 	{
 		m_DB_outbound_label="F";
 	}
-	else if(nextstatus==11)  //(3_11肯定)那您有兴趣办一张我们的广发联通信用卡吗？
+	else if(nextstatus==13)  
 	{
 		m_DB_outbound_label="A1";
 	}
