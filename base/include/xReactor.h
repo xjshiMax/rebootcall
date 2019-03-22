@@ -94,5 +94,4 @@ public:
 private:
 	static xReactor* m_reactor;;
 };
-
 }

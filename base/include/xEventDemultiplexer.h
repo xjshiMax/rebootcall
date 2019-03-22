@@ -40,5 +40,4 @@ private:
 	int m_fd_num;	  // 当前加入集合的描述符数量
 };
 
-
  }

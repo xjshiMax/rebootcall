@@ -148,7 +148,7 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 					strwork="";
 				}
 			}//while #
-		}
+		}//in_tab
 // 		else if(strkey.find("tab_yes")!=string::npos)
 // 		{
 // 			if(checked)
@@ -291,7 +291,7 @@ void FSsession::Action()
 			{
 				m_IsAsr=false;
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
-				collection("客户",asrResp);
+				collection("客户",asrParstText);
 				string asrText=asrParstText;
 				esl_log(ESL_LOG_INFO, "asr_txt=%s\n", asrText.c_str());
 				char strSCID[32]={0};
@@ -414,7 +414,7 @@ void FSsession::Action()
 						m_DB_talk_times+=1;
 						esl_log(ESL_LOG_INFO, "playback know_voice ,nodeState:%d know_path=%s \n",nodeState,know_path.c_str());
 						sleep(1);
-						m_IsAsr=true;
+						//m_IsAsr=true;
 						return ;
 					}
 				case SC_Hungup:
@@ -455,7 +455,7 @@ void FSsession::Action()
 // 					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
 // 					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
 // 				}
-				m_IsAsr=true;
+				//m_IsAsr=true;
 				return;
 			}//m_IsAsr
 			}//asr
@@ -611,6 +611,7 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_PLAYBACK_STOP:
 	{
+		m_IsAsr=true;
 		//????????????
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
@@ -688,7 +689,7 @@ void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string u
 	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
 	// esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
 	//esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", uuid.c_str());
-	m_IsAsr=true;
+	//m_IsAsr=true;
 	//sleep(10);
 	//esl_execute(handle, "stop_asr", NULL, uuid.c_str());
 
@@ -697,9 +698,9 @@ void FSsession::InsertSessionResult()
 {
 	SetFinnallabel();
 	char querysql[4096]={0};
-	string strsql="Insert into "+db_operator_t::m_call_cdr_tbl+" (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at)values ";
+	string strsql="Insert into "+db_operator_t::m_call_cdr_tbl+" (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at,username,sessiontext)values ";
 	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d,'%s','%s')",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
-		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at);
+		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at,m_username.c_str(),m_SessionWord.c_str());
 	esl_log(ESL_LOG_INFO,"insert the session redcord:%s\n",querysql);
 	//db_operator_t::initDatabase();
 	db_operator_t::InsertSessionRe(querysql);
