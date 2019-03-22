@@ -29,7 +29,7 @@ bool db_operator_t::initDatabase()
 	m_ivr_node_flow_tbl=IniService.getStringValue("datatable","ivr_node_flow_tbl",iret);
 	m_knowledge_base_tbl=IniService.getStringValue("datatable","knowledge_base_tbl",iret);
 	m_ai_callout_tbl=IniService.getStringValue("datatable","ai_callout_tbl",iret);
-	m_call_cdr_tbl=IniService.getStringValue("datatable","m_call_cdr_tbl",iret);
+	m_call_cdr_tbl=IniService.getStringValue("datatable","call_cdr_tbl",iret);
     DBPool::GetInstance()->initPool(servername.c_str(), username.c_str(), password.c_str(), 20);
     return true;
 

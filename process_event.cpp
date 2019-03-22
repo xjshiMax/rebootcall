@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include "base/glog/linux/glog/logging.h"
 using namespace std;
-#define _Use_ALI_SDK
+//#define _Use_ALI_SDK
 typedef enum{
 	SC_Opening_Remarks=1,
 	SC_Add_In_Wechat,
