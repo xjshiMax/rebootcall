@@ -75,6 +75,33 @@ void FSsession::collection(string name,string Text,int node)
 	if(node!=-1)
 		m_nodelist.push_back(node);
 }
+void FSsession::silenceAdd(int val)
+{
+	esl_log(ESL_LOG_INFO,"silenceAdd,val=%d\n",val);
+	xAutoLock l(m_silenceLock);
+	if(m_playbackstatus==Session_playing)
+	{
+		esl_log(ESL_LOG_INFO,"silenceAdd,Session_playing\n");
+		m_silenceTime=0;
+		return;
+	}
+	if(val)
+		m_silenceTime=m_silenceTime+val;
+	else
+		m_silenceTime=0;	//置零
+}
+bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
+{
+	esl_log(ESL_LOG_INFO,"CheckoutIfsilence\n");
+	xAutoLock l(m_silenceLock);
+	if(m_silenceTime+1>=m_maxsilenceTime)
+	{
+		m_silenceTime=0;
+		return true;
+	}
+	else
+		return false;
+}
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
 	if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
@@ -260,7 +287,78 @@ void FSsession::Onanswar()
 
 	}
 }
+void FSsession::Onsilence()
+{
+	switch(m_silencestatus)
+	{
+	case Session_nosilence:
+		{
+			m_silencestatusLock.lock();
+			m_silencestatus=Session_silencefirst;
+			m_silencestatusLock.unlock();
+			m_IsAsr=false;
+			map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
+			char strcmdSCID[32]={0};
+			sprintf(strcmdSCID,"%s_%d",m_speeckCraftID.c_str(),0);  //nodemap 里为0的节点，为静音播放节点
+			map<string, base_script_t>::iterator iter= nodeMap.find(strcmdSCID);
+			if (iter != nodeMap.end())
+			{
+				base_script_t node = iter->second;
+				node.vox_base += ".wav";
+				printf("100 stop_asr uuid:%s",strUUID.c_str());
+				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
+				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				collection("机器人",node.desc,0);
+				//	m_DB_talk_times+=1;
+				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",0);
+				LOG(INFO)<<"playback the Onsilence ,nodeState:"<<0;
 
+			}
+			else
+			{
+				esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
+			}
+		}
+		break;
+	case Session_silencefirst:
+		{
+			m_silencestatusLock.lock();
+			m_silencestatus=Session_silenceSecond;
+			m_silencestatusLock.unlock();
+			m_IsAsr=false;
+			map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
+			char strcmdSCID[32]={0};
+			sprintf(strcmdSCID,"%s_%d",m_speeckCraftID.c_str(),10);  //nodemap 里为0的节点，为静音播放节点
+			map<string, base_script_t>::iterator iter= nodeMap.find(strcmdSCID);
+			if (iter != nodeMap.end())
+			{
+				base_script_t node = iter->second;
+				node.vox_base += ".wav";
+				printf("100 stop_asr uuid:%s",strUUID.c_str());
+				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
+				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				collection("机器人",node.desc,0);
+				//	m_DB_talk_times+=1;
+				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",0);
+				LOG(INFO)<<"playback the Onsilence ,nodeState:"<<0;
+
+
+
+			}
+			else
+			{
+				esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
+			}
+		}
+		break;
+	case Session_silenceSecond:
+		{
+
+		}
+		break;
+	}
+	
+}
 void FSsession::Action()
 {
 	string event_subclass, contact, from_user;
@@ -318,6 +416,9 @@ void FSsession::Action()
 			if(m_IsAsr)
 			{
 				m_IsAsr=false;
+				m_silencestatusLock.lock();
+				m_silencestatus=Session_nosilence;
+				m_silencestatusLock.unlock();
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
 				collection("客户",asrResp);
 				string asrText=asrParstText;
@@ -640,7 +741,8 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_PLAYBACK_START:
 	{
-
+		m_playbackstatus=Session_playing;
+		silenceAdd(Session_resetsilence);
 		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
 
 		//??????
@@ -652,6 +754,11 @@ void FSsession::Action()
 	case ESL_EVENT_PLAYBACK_STOP:
 	{
 		m_IsAsr=true;
+		if(m_playbackstatus==Session_playing)
+		{
+			m_playbackstatus=Session_noplayback;
+			esl_log(ESL_LOG_INFO, "m_playbackstatus Session_noplayback\n");
+		}
 		//????????????
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
@@ -675,9 +782,15 @@ void FSsession::Action()
 			{
 				esl_log(ESL_LOG_INFO, "handup Result is keyword :%s\n", keyword.c_str());
 				esl_execute(handle, "hangup", NULL, strUUID.c_str());
+				break;
 			}
 		}
-
+		if(m_silencestatus==Session_silenceSecond)
+		{
+			esl_log(ESL_LOG_INFO, " m_silencestatus:Session_silenceSecond\n");
+			esl_execute(handle, "hangup", NULL, strUUID.c_str());
+			break;
+		}
 		break;
 	}
 	case ESL_EVENT_CHANNEL_PROGRESS:
@@ -922,11 +1035,41 @@ void FScallManager::CheckEndCall()
 		}
 	}
 }
+slienceCheck::slienceCheck(int timeout):OnTimerBase(timeout)
+{
+
+}
+slienceCheck::~slienceCheck()
+{
+
+}
+void slienceCheck::timeout()
+{
+	xAutoLock L(FSprocess::m_sessionlock);
+	map<string,FSsession*>::iterator ite=FSprocess::m_SessionSet.begin();
+	while(ite!=FSprocess::m_SessionSet.end())
+	{
+		FSsession*p=ite->second;
+		if(p)
+		{
+			p->silenceAdd(Session_silenceinc);
+			if(p->CheckoutIfsilence())
+			{
+				p->silenceAdd(Session_resetsilence);
+				p->Onsilence();
+			}
+		}
+		
+		ite++;
+	}
+}
 map<string, base_script_t> FSprocess::m_gKeymap;
 vector<base_knowledge_t>FSprocess::m_knowledgeSet;
 map<string,FSsession*> FSprocess::m_SessionSet;
 esl_handle_t* FSprocess::m_sessionHandle=NULL;
 string FSprocess::m_recordPath="/home/path";
+xMutex FSprocess::m_sessionlock;
+int FSprocess::m_userSetsilenseTime;
 void FSprocess::Initability()
 {
 	IniFile IniService;
@@ -949,18 +1092,30 @@ void FSprocess::Initability()
 	{
 		m_fsPassword="ClueCon";
 	}
+	iret=-1;
 	string recordpath=IniService.getStringValue("RECORDPATH","path",iret);
 	if(iret==0)
 	{
 		m_recordPath=recordpath;
 	}
 	iret=-1;
+	m_userSetsilenseTime=IniService.getIntValue("FREESWITCH","SILENCE",iret);
+	if(iret!=0)
+	{
+		m_userSetsilenseTime=7;
+	}
+}
+void FSprocess::startProcess()
+{
+	Initability();
+	start();
+	m_slienceCheck.start();
 }
 void FSprocess::run()
 {
 	Inbound_Init((void*)"userinfo");
 }
-FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username)
+FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime)
 {
 	FSsession* psession=new FSsession;
 	psession->m_taskID=strtaskID;
@@ -976,6 +1131,7 @@ FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,stri
 	psession->m_DB_start_stamp=psession->Getcurrenttime();
 	psession->m_DB_updated_at=0;
 	psession->m_username=username;
+	psession->m_maxsilenceTime=silenceTime;
 	return psession;
 }
 FSsession* FSprocess::GetSessionbychannelid(string channel)
@@ -1153,7 +1309,7 @@ void FSprocess::process_event(esl_handle_t *handle,
 			{
 				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER call in uuid:%s \n", strUUID.c_str());
 			}
-			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname,strusername);
+			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname,strusername,m_userSetsilenseTime);
 			if(psession==NULL)
 			{
 				esl_log(ESL_LOG_INFO,"CreateSession failed\n");

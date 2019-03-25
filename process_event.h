@@ -23,6 +23,7 @@
 #include <iostream>
 #include "base/include/xthreadPool.h"
 #include "base/inifile/inifile.h"
+#include "base/include/xOntimerBase.h"
 using namespace std;
 using namespace inifile;
 using namespace SAEBASE;
@@ -35,12 +36,22 @@ typedef enum
 	GF_nothear=0x02,		//听不清
 
 };
+typedef enum{
+	Session_resetsilence=0,
+	Session_silenceinc,
+	Session_nosilence,
+	Session_playing,
+	Session_noplayback,
+	Session_silencefirst,
+	Session_silenceSecond,
+};
 class FSprocess;
 /* 与fs之间的通信*/
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node){}
+		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
+		m_silenceTime(0),m_silencestatus(Session_nosilence),m_playbackstatus(Session_noplayback){}
 		virtual int run();
 		void Action();
 		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
@@ -55,6 +66,9 @@ class FSsession:public xtaskbase
 		void ChangetheTypeCount(string strtype);
 		void SetFinnallabel(int currentstatus,int nextstatus);
 		void collection(string name,string Text,int nodeState=-1);
+		void silenceAdd(int val);
+		bool CheckoutIfsilence(); //	检测是否是静音，是则返回真
+		void Onsilence();
 
 	public:
 		esl_handle_t *handle;
@@ -89,6 +103,12 @@ class FSsession:public xtaskbase
 		Mutex m_databaselock;
 		int m_SessionState;		//会话状态，正常节点还是知识库和没听清
 		vector<int> m_nodelist;			//记录关键字命中节点，不记录知识库
+		int m_silenceTime;		//静音时间。
+		int m_maxsilenceTime;
+		int m_silencestatus;
+		int m_playbackstatus;
+		Mutex m_silenceLock;
+		Mutex m_silencestatusLock;
 };
 /* 发送fs批量呼叫请求 one-task-one-thread*/
 class FScall:public Threadbase
@@ -132,11 +152,23 @@ public:
 	void CheckEndCall();
 };
 
+/*
+定时器线程，定时1秒做会话的静音检测。
+*/
+class slienceCheck:public OnTimerBase
+{
+public:
+	slienceCheck(int timeout);
+	~slienceCheck();
+	virtual void timeout();
+
+};
+
 /* 处理fs回传消息中心， 使用线程池管理FSsession*/
 class FSprocess :public Threadbase
 {
 public:
-	FSprocess()
+	FSprocess():m_slienceCheck(1)
 	{
 		//SessionPool.initsimplePool();
 		//SessionPool.startPool();
@@ -147,7 +179,8 @@ public:
 	}
 	void Initability();
 	virtual void run();
-	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username);
+	void startProcess();
+	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime);
 	void *Inbound_Init(void *arg);
 	static void *test_Process(void *arg);
 	void  process_event(esl_handle_t *handle,
@@ -162,10 +195,12 @@ public:
 //xthreadPool SessionPool;
 	static map<string,FSsession*> m_SessionSet;
 	static esl_handle_t* m_sessionHandle;
-	xMutex m_sessionlock;
+	static xMutex m_sessionlock;
 	string m_fsip;
 	int m_fsPort;
 	string m_fsPassword;
 	static string m_recordPath;
+	slienceCheck m_slienceCheck;
+	static int m_userSetsilenseTime;
 };
 

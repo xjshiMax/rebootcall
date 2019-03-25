@@ -78,8 +78,7 @@ int main(int argc, char const *argv[])
 	LOG(INFO)<<"start tcp server";
     //注册fs事件响应。
     FSprocess FSprocessInst;
-	FSprocessInst.Initability();
-    FSprocessInst.start();
+    FSprocessInst.startProcess();
 
 	//注册语音转文本事件
 	//FSasrprocess FSasrprocessInst;
