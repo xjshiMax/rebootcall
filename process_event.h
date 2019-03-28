@@ -63,7 +63,7 @@ class FSsession:public xtaskbase
 		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_duration(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
 			m_silenceTime(0),m_silencestatus(Session_noanswar),m_playbackstatus(Session_noplayback),m_DB_hungup("customer hung up"){}
 		virtual int run();
-		void Action();
+		void Action(esl_handle_t *phandle,esl_event_t *pevent);
 		//void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
 		void SetSessionID(string sessionid){m_parksessionID=sessionid;}
 		string GetSessionID(){return m_parksessionID;};

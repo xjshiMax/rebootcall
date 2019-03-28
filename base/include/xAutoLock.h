@@ -76,7 +76,7 @@ private:
 };
 
 //Ìõ¼þÐÅºÅ
-class xCondition:protected Noncopyable
+class xCondition/*:protected Noncopyable*/
 {
 public:
 	xCondition(void)throw(){pthread_cond_init(&m_cond,NULL);}

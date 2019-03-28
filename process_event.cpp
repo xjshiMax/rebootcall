@@ -26,7 +26,8 @@ typedef enum{
 }e_Speeckcase;
 int FSsession::run()
 {
-	Action();
+	//Action();
+	return 0;
 }
 void FSsession::ChangetheTypeCount(string strtype)
 {
@@ -79,7 +80,9 @@ void FSsession::collection(string name,string Text,int node)
 	LONGLONG time=GetUTCtimestamp();
 	char strtime[32]={0};
 	sprintf(strtime,"%d",time);
-	m_SessionWord+=name+"("+string(strtime)+"): ";
+	m_SessionWord+=name+"(";
+	m_SessionWord+=strtime;
+	m_SessionWord+="): ";
 	m_SessionWord+=Text;
 	m_SessionWord+="\r\n";
 	if(node!=-1)
@@ -379,7 +382,7 @@ void FSsession::Onsilence()
 	}
 	
 }
-void FSsession::Action()
+void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 {
 	xAutoLock l(m_databaselock);
 	string event_subclass, contact, from_user;
@@ -407,7 +410,7 @@ void FSsession::Action()
 // 		}
 // 		else if (event_subclass == "asr")
 // 		{
-			string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
+			string asrResp = esl_event_get_header(pevent, "ASR-Response") ? esl_event_get_header(pevent, "ASR-Response") : "";
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);
 			LOG(INFO)<<"asrResp="<<asrResp;
 			LOG(INFO)<<"strUUID="<<strUUID;
@@ -607,23 +610,11 @@ void FSsession::Action()
 					m_DB_talk_times+=1;
 					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
 					LOG(INFO)<<"playback the answar ,nodeState:"<<nodeState;
-// 					if(node.userWord=="")
-// 					{
-// 						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
-// 						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-// 					}
-				//	return;
 				}
 				else
 				{
 					esl_log(ESL_LOG_INFO, "not find the voice file ,nodeState:%d \n",nodeState);
 				}
-// 				if(nextstate==SC_Add_Back_Wechat||nextstate==SC_Bye||nextstate==SC_Contect_nextTime)
-// 				{
-// 					esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
-// 					esl_execute(handle, "hangup", NULL, a_uuid.c_str());
-// 				}
-				//m_IsAsr=true;
 				return;
 			}//m_IsAsr
 		//	}//asr
@@ -634,15 +625,15 @@ void FSsession::Action()
 		break;
 	case ESL_EVENT_DTMF:
 	{
-		string dtmf = esl_event_get_header(event, "DTMF-Digit") ? esl_event_get_header(event, "DTMF-Digit") : "";
+		string dtmf = esl_event_get_header(pevent, "DTMF-Digit") ? esl_event_get_header(pevent, "DTMF-Digit") : "";
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
-		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+		strUUID = esl_event_get_header(pevent, "Caller-Unique-ID") ? esl_event_get_header(pevent, "Caller-Unique-ID") : "";
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
 		//destination_number = esl_event_get_header(event, "Caller-Destination-Number")? esl_event_get_header(event, "Caller-Destination-Number") : "";
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : "";
-		const char *eventbody = esl_event_get_body(event);
-		printf("body:\n%s\n", eventbody);
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : "";
+		//const char *eventbody = esl_event_get_body(pevent);
+		//printf("body:\n%s\n", eventbody);
 		esl_log(ESL_LOG_INFO, "dtmf :%s\n", dtmf.c_str());
 		printf("ESL_EVENT_DTMF:inbound dtmf :%s\n", dtmf.c_str());
 
@@ -696,17 +687,17 @@ void FSsession::Action()
 	case ESL_EVENT_CHANNEL_EXECUTE_COMPLETE:
 	{
 		esl_log(ESL_LOG_DEBUG, "ESL_EVENT_CHANNEL_EXECUTE_COMPLETE:inbound EXECUTE_COMPLETE :%s\n", strUUID.c_str());
-		const char *application = esl_event_get_header(event, "Application");
+		const char *application = esl_event_get_header(pevent, "Application");
 
 		break;
 	}
 	case ESL_EVENT_CHANNEL_HANGUP:
 	{
 		string is_callout;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 		string bridged_uuid;
 		string hangup_cause;
-		hangup_cause = esl_event_get_header(event, "variable_sip_term_cause") ? esl_event_get_header(event, "variable_sip_term_cause") : "";
+		hangup_cause = esl_event_get_header(pevent, "variable_sip_term_cause") ? esl_event_get_header(pevent, "variable_sip_term_cause") : "";
 		{
 			esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_HANGUP:CALL IN  :%s\n", strUUID.c_str());
 			esl_log(ESL_LOG_INFO, "hangup cause:%s\n", hangup_cause.c_str());
@@ -718,10 +709,10 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_CHANNEL_HANGUP_COMPLETE:
 	{
-		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+		strUUID = esl_event_get_header(pevent, "Caller-Unique-ID") ? esl_event_get_header(pevent, "Caller-Unique-ID") : "";
 		//????????????????????????
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 		{
 			esl_log(ESL_LOG_INFO, "CALL OUT HANGUP_COMPLETE :%s\n", strUUID.c_str());
 			//record
@@ -732,35 +723,20 @@ void FSsession::Action()
 	case ESL_EVENT_CHANNEL_DESTROY:
 	{
 		//to do??????????????????????????????????????????????
-		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
-		string hangupTime = esl_event_get_header(event, "Caller-Channel-Hangup-Time") ? esl_event_get_header(event, "Caller-Channel-Hangup-Time") : "";
+		string is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
+		string hangupTime = esl_event_get_header(pevent, "Caller-Channel-Hangup-Time") ? esl_event_get_header(pevent, "Caller-Channel-Hangup-Time") : "";
 
-		string recordFileName = esl_event_get_header(event, "variable_record_filename") ? esl_event_get_header(event, "variable_record_filename") : "";
+		string recordFileName = esl_event_get_header(pevent, "variable_record_filename") ? esl_event_get_header(pevent, "variable_record_filename") : "";
 
 		{
 			esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", __FILE__, __LINE__, strUUID.c_str());
 		}
 		break;
 	}
-	case ESL_EVENT_CHANNEL_ANSWER:
-	{
-		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
-		//const char *eventbody=esl_event_get_body(event);
-		//printf("body:\n%s\n",eventbody);
-		string bridged_uuid;
-
-		bridged_uuid = esl_event_get_header(event, "other-leg-unique-id") ? esl_event_get_header(event, "other-leg-unique-id") : "";
-		{
-			esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER call in uuid:%s \n", strUUID.c_str());
-		}
-		break;
-	}
-
 	case ESL_EVENT_CHANNEL_OUTGOING:
 	{
 		string is_callout;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 																																   /*const char *eventbody=esl_event_get_body(event);
 			printf("body:\n%s\n",eventbody);*/
 		break;
@@ -769,7 +745,7 @@ void FSsession::Action()
 	{
 		m_playbackstatus=Session_playing;
 		silenceAdd(Session_resetsilence);
-		string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		string is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 
 		//??????
 		{
@@ -791,7 +767,7 @@ void FSsession::Action()
 	//	destination_number = esl_event_get_header(event, "Caller-Destination-Number")? esl_event_get_header(event, "Caller-Destination-Number") : "";
 	//	strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 		{
 			esl_log(ESL_LOG_INFO, "CALL IN ESL_EVENT_PLAYBACK_STOP %s\n", strUUID.c_str());
 		}
@@ -824,14 +800,14 @@ void FSsession::Action()
 	}
 	case ESL_EVENT_CHANNEL_PROGRESS:
 	{
-		a_uuid = esl_event_get_header(event, "variable_a_leg_uuid") ? esl_event_get_header(event, "variable_a_leg_uuid") : "";
+		a_uuid = esl_event_get_header(pevent, "variable_a_leg_uuid") ? esl_event_get_header(pevent, "variable_a_leg_uuid") : "";
 		string is_callout, a_leg_uuid;
-		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+		is_callout = esl_event_get_header(pevent, "variable_is_callout") ? esl_event_get_header(pevent, "variable_is_callout") : ""; // ?????1???????????????
 		/*const char *eventbody=esl_event_get_body(event);
 			printf("body:\n%s\n",eventbody);*/
 		string bridged_uuid;
 
-		bridged_uuid = esl_event_get_header(event, "other-leg-unique-id") ? esl_event_get_header(event, "other-leg-unique-id") : "";
+		bridged_uuid = esl_event_get_header(pevent, "other-leg-unique-id") ? esl_event_get_header(pevent, "other-leg-unique-id") : "";
 		//printf("%s, %d\tbridged_uuid:%s\n",__FILE__,__LINE__,bridged_uuid.c_str());
 		{
 			esl_log(ESL_LOG_INFO, "CHANNEL_PROGRESS %s\n", strUUID.c_str());
@@ -1195,8 +1171,8 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 			{
 				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
-				const char *eventbody = esl_event_get_body(event);
-				esl_log(ESL_LOG_INFO, "eventbody=%s\n", eventbody);
+// 				const char *eventbody = esl_event_get_body(event);
+// 				esl_log(ESL_LOG_INFO, "eventbody=%s\n", eventbody);
 				string coreuuid = esl_event_get_header(event, "Core-UUID") ? esl_event_get_header(event, "Core-UUID") : "";
 				esl_log(ESL_LOG_INFO, "coreuuid=%s\n", coreuuid.c_str());
 				string Channel = esl_event_get_header(event, "Channel") ? esl_event_get_header(event, "Channel") : "";
@@ -1210,7 +1186,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 					esl_log(ESL_LOG_INFO,"get the right sesson by id \n");
 					psession->handle=handle;
 					psession->event=event;
-					psession->Action();
+					psession->Action(handle,event);
 				}
 			}
 
@@ -1308,7 +1284,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				{
 					psession->handle=handle;
 					psession->event=event;
-					psession->Action();
+					psession->Action(handle,event);
 				}
 			}
 		}
@@ -1356,7 +1332,8 @@ void FScallManager::CheckEndCall()
 		{
 			if(pcall->m_recallTimes<=0)
 			{
-				esl_log(ESL_LOG_INFO,"********delete call\n");
+				string taskid=CheckIte->first;
+				esl_log(ESL_LOG_INFO,"********delete call:CheckIte->id\n",taskid.c_str());
 				m_TaskSet.erase(CheckIte++);
 				delete pcall;
 				pcall=NULL;
@@ -1396,7 +1373,7 @@ string FScallManager::HandleMessage(string data)
 	string taskid;
 	string taskname;
 	if(!ParseData(data,cmd,scid,taskid,taskname))
-		return;
+		return ERRORJSON;
 	esl_log(ESL_LOG_INFO,"::::cmd:%s\n",cmd.c_str());
 	if(cmd=="start")  //开始任务或者重新开始
 	{
@@ -1413,9 +1390,9 @@ string FScallManager::HandleMessage(string data)
 		if (!Onecall->Getablibity(data))
 			return ERRORJSON;
 		//Onecall->maxSessionCreate=0;
+		Onecall->GetnumbrList();
 		if(Onecall->m_robotNum<=0||Onecall->m_robotNum>MaxRobotNum)
 			return ERRORROBOT;
-		Onecall->GetnumbrList();
 		Onecall->start();
 		m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
 		return CMDOK;
