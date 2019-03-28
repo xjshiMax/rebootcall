@@ -64,7 +64,7 @@ class FSsession:public xtaskbase
 			m_silenceTime(0),m_silencestatus(Session_noanswar),m_playbackstatus(Session_noplayback),m_DB_hungup("customer hung up"){}
 		virtual int run();
 		void Action();
-		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
+		//void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
 		void SetSessionID(string sessionid){m_parksessionID=sessionid;}
 		string GetSessionID(){return m_parksessionID;};
 		void InsertSessionResult();
@@ -161,6 +161,7 @@ public:
 	string m_taskID;		//任务id
 	string m_taskName;		//任务名称
 	string m_speechcraftID;  //话术id
+	int m_originate_timeout;	//拨打电话时设置最长不接听自动挂断时间
 	string m_fsip;
 	int m_fsPort;
 	string m_fsPassword;
@@ -188,7 +189,7 @@ public:
 	map<string ,FScall*>m_TaskSet;
 	static FScallManager* Instance();
 	void CheckEndCall();
-	void HandleMessage(string data);
+	string HandleMessage(string data);
 	void CallEvent_handle(esl_handle_t *handle,
 		esl_event_t *event,
 		map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib);

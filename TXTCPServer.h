@@ -21,7 +21,10 @@ class TXTCPServer:public xTcpServerBase
 		//收到批量请求
 		FScallManager* CallManager=FScallManager::Instance();
 		//CallManager->CheckEndCall();
-		CallManager->HandleMessage(date);
+		string  msg=CallManager->HandleMessage(date);
+		char returnmsg[256]={0};
+		sprintf(returnmsg,"{\"status\":\"%s\"}",msg.c_str());
+		SendSocket(socketfd,returnmsg,strlen(returnmsg));
 		return 0;
 	}
 	virtual int Onclose(int socketfd)

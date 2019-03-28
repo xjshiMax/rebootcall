@@ -7,6 +7,12 @@
 #include "base/glog/linux/glog/logging.h"
 using namespace std;
 #define _Use_ALI_SDK
+#define MaxRobotNum 10
+#define ERRORCMD	"do not support this cmd.only support start,pause,resume,stop"
+#define ERRORTASKID	"not exit this taskid"
+#define ERRORROBOT	"robot number is invalid"
+#define ERRORJSON	"json parse failed"
+#define CMDOK		"ok"
 typedef enum{
 	SC_Opening_Remarks=1000,
 	SC_Add_In_Wechat,
@@ -297,7 +303,8 @@ void FSsession::Onanswar()
 		base_script_t node = iter->second;
 		node.vox_base += ".wav";
 		esl_execute(handle, "set", "node_state=1", strUUID.c_str());
-		playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+		//playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
+		esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
 		collection("机器人",node.desc,nodeState);
 
 	}
@@ -853,22 +860,11 @@ void FSsession::Action()
 	}
 	return ;
 }
-void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string uuid)
-{
-	// string param = playFile + " detect:unimrcp {start-input-timers=true,no-input-timeout=90000,recognition-timeout=90000}hello";
-
-	// esl_execute(handle, "play_and_detect_speech", param.c_str(), uuid.c_str());
-	// esl_execute(handle, "set", "play_and_detect_speech_close_asr=true", uuid.c_str());
-	//  esl_execute(handle, "detect_speech", "stop", uuid.c_str());
-	//esl_execute(FSprocess::getSessionhandle(), "playback", "/root/txcall/play/1a.wav", uuid.c_str());
-	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
-	// esl_execute(handle, "detect_speech", "unimrcp:baidu-mrcp2 hello hello", uuid.c_str());
-	//esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", uuid.c_str());
-	//m_IsAsr=true;
-	//sleep(10);
-	//esl_execute(handle, "stop_asr", NULL, uuid.c_str());
-
-}
+// void FSsession::playDetectSpeech(string playFile, esl_handle_t *handle, string uuid)
+// {
+// 	esl_execute(handle, "playback", playFile.c_str(), uuid.c_str());
+// 
+// }
 void FSsession::InsertSessionResult()
 {
 	//SetFinnallabel();
@@ -917,6 +913,11 @@ int FScall::GetnumbrList()
 	  //db_operator_t::initDatabase();
 	 db_operator_t::GetnumberList(m_NumberSet,m_taskID);
 	 db_operator_t::Getcallability(m_robotNum,m_recallTimes,m_taskID);
+// 	 if (m_robotNum<=0||m_robotNum>=MaxRobotNum)
+// 	 {
+// 		esl_log(ESL_LOG_INFO,"the invalid rebot num\n");
+// 		 m_robotNum=MaxRobotNum;
+// 	 }
 	 esl_log(ESL_LOG_INFO,"FScall::GetnumbrList,m_robotNum=%d,m_recallTimes=%d\n",m_robotNum,m_recallTimes);
 	  return 0;
 }
@@ -941,6 +942,12 @@ void FScall::Initability()
 	if(iret!=0)
 	{
 		m_fsPassword="ClueCon";
+	}
+	iret=-1;
+	m_originate_timeout=IniService.getIntValue("FREESWITCH","ORIGTIMEOUT",iret);
+	if(iret!=0)
+	{
+		m_originate_timeout=45;
 	}
 	iret=-1;
 }
@@ -1060,7 +1067,7 @@ int FScall::LauchFScall()
 			NumCancall=m_robotNum-m_SessionSet.size();
 		}
 		//originate_time
-		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=40,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=%d,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_originate_timeout,m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s,FSprocess::m_SessionSet.size()=%d\n",callCmd,m_SessionSet.size()); 
@@ -1269,6 +1276,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 						userinfo.phonenum=psession->caller_id;
 						userinfo.username=psession->m_username;
 						m_notAnswerSet.push_back(userinfo);
+						psession->m_DB_outbound_label="";
 						esl_log(ESL_LOG_INFO,"m_notAnswerSet.size()=%d\n",m_notAnswerSet.size());
 					}
 					//m_sessionlock.lock();
@@ -1381,7 +1389,7 @@ FScall*FScallManager::GetFSCallbyUUID(string& struuid)
 	}
 	return NULL;
 }
-void FScallManager::HandleMessage(string data)
+string FScallManager::HandleMessage(string data)
 {
 	string cmd;
 	string scid;
@@ -1403,11 +1411,14 @@ void FScallManager::HandleMessage(string data)
 		FScall* Onecall=new FScall;
 		Onecall->Initability();
 		if (!Onecall->Getablibity(data))
-			return ;
+			return ERRORJSON;
 		//Onecall->maxSessionCreate=0;
+		if(Onecall->m_robotNum<=0||Onecall->m_robotNum>MaxRobotNum)
+			return ERRORROBOT;
 		Onecall->GetnumbrList();
 		Onecall->start();
 		m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
+		return CMDOK;
 	}
 	else if(cmd=="pause")	//暂停任务
 	{
@@ -1417,6 +1428,7 @@ void FScallManager::HandleMessage(string data)
 			FScall*pcall=ite->second;
 			pcall->PauseTask();
 		}
+		return CMDOK;
 	}
 	else if(cmd=="resume")	//恢复
 	{
@@ -1426,6 +1438,7 @@ void FScallManager::HandleMessage(string data)
 			FScall*pcall=ite->second;
 			pcall->ResumeTask();
 		}
+		return CMDOK;
 	}
 	else if(cmd=="stop")
 	{
@@ -1437,7 +1450,9 @@ void FScallManager::HandleMessage(string data)
 			m_TaskSet.erase(ite);
 			m_TaskSet.insert(pair<string,FScall*>(pcall->m_taskID+"deleted",pcall));
 		}
+		return CMDOK;
 	}
+	return ERRORCMD;
 }
 void FScallManager::CallEvent_handle(esl_handle_t *handle,
 	esl_event_t *event,
