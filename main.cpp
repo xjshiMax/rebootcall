@@ -35,6 +35,8 @@ int main(int argc, char const *argv[])
         printf("node==%s,descript=%s\n", strmap_iter->first.c_str(),node.desc.c_str());
 
     }
+	FScallManager*pcallmagnger = FScallManager::Instance();
+	pcallmagnger->startTimer();
     //启动tcp服务
     xReactorwithThread ReactorInst;
     TXTCPServer BussinessTCP;
@@ -77,7 +79,7 @@ int main(int argc, char const *argv[])
     BussinessTCP.startTCPServer(&ReactorInst,strIP.c_str(),Port);
 	LOG(INFO)<<"start tcp server";
     //注册fs事件响应。
-    FSprocess FSprocessInst;
+    static FSprocess FSprocessInst;
     FSprocessInst.startProcess();
 
 	//注册语音转文本事件

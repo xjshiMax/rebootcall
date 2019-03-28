@@ -40,18 +40,28 @@ typedef enum{
 	Session_resetsilence=0,
 	Session_silenceinc,
 	Session_nosilence,
+	Session_noanswar,
 	Session_playing,
 	Session_noplayback,
 	Session_silencefirst,
 	Session_silenceSecond,
+};
+typedef enum
+{
+	CallInit,
+	CallStart,
+	CallPause,
+	CallResume,
+	CallStop,
+	Recall
 };
 class FSprocess;
 /* 与fs之间的通信*/
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
-		m_silenceTime(0),m_silencestatus(Session_nosilence),m_playbackstatus(Session_noplayback){}
+		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_duration(0),m_DB_outbound_label("G"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
+			m_silenceTime(0),m_silencestatus(Session_noanswar),m_playbackstatus(Session_noplayback),m_DB_hungup("customer hung up"){}
 		virtual int run();
 		void Action();
 		void playDetectSpeech(string playFile, esl_handle_t *handle, string uuid);
@@ -93,6 +103,7 @@ class FSsession:public xtaskbase
 		int m_DB_creatd_at;			//插入数据库时间 utc
 		int m_DB_updated_at;		//更新数据库时间
 		string m_DB_task_name;
+		string m_DB_hungup;			//挂断方，主挂，被挂
 
 		int m_Atimes;
 		int m_Btimes;
@@ -114,22 +125,38 @@ class FSsession:public xtaskbase
 class FScall:public Threadbase
 {
 public:
-	FScall():m_IsAllend(false)
+	FScall():m_IsAllend(false),m_stop(false),m_CallStatus(CallInit),maxSessionDestory(0),maxCallout(0)
 	{
-
+	//	m_Sessioncond
 	}
 	virtual ~FScall()
 	{
 		//if(m_inst)
 		//	delete m_inst;
+		m_Sessioncond.broadCast();
 		cout<<"~FScall is called;"<<endl;
 	}
 	void Initability();
 	virtual void run();
 	int GetnumbrList();
 	int LauchFScall();
+	int reLauchFSCall();
+	void Checksilence();
 	void setCallNumber(string number){m_taskID=number;}
 	bool Getablibity(string jsonstr); //json信息
+	void StopTask();
+	void PauseTask();
+	void ResumeTask();
+	void CallEvent_handle(esl_handle_t *handle,
+		esl_event_t *event,
+		map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib);
+	FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime);
+	FSsession* GetSessionbychannelid(string channel);
+	FSsession*GetSessionbymainUUID(string& strmainid);
+	bool FinishCreateAllSession(){return (m_NumberSet.size()==maxSessionDestory)||(m_CallStatus==CallStop&&maxCallout==maxSessionDestory);}
+	//bool FinishbeforeStop();
+	int maxSessionDestory;
+	int maxCallout;
 	string m_callnumber;
 	string m_taskID;		//任务id
 	string m_taskName;		//任务名称
@@ -141,34 +168,48 @@ public:
 	static FScall*Instance();
 	static FScall*m_inst;
 	bool m_IsAllend;		//电话号码全部拨打完毕
+	bool m_stop;
+	int m_CallStatus;
+	vector<t_Userinfo>::iterator m_pPauseIte;
+	int m_robotNum;
+	int m_recallTimes;
+
+	map<string,FSsession*> m_SessionSet;
+	std::vector<t_Userinfo> m_notAnswerSet;
+	xMutex m_sessionlock;
+	xCondition m_Sessioncond;
 };
 //管理通话任务类
-class FScallManager
+class FScallManager:public OnTimerBase
 {
 public:
-	FScallManager(){};
+	FScallManager(int timeout):OnTimerBase(timeout),m_count(0){};
 	~FScallManager(){};
 	map<string ,FScall*>m_TaskSet;
+	static FScallManager* Instance();
 	void CheckEndCall();
-};
-
-/*
-定时器线程，定时1秒做会话的静音检测。
-*/
-class slienceCheck:public OnTimerBase
-{
-public:
-	slienceCheck(int timeout);
-	~slienceCheck();
+	void HandleMessage(string data);
+	void CallEvent_handle(esl_handle_t *handle,
+		esl_event_t *event,
+		map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib);
+	FScall*GetFSCallbyUUID(string& struuid);
+	bool ParseData(string jsonstr,string& cmd,string& scid,string& taskid,string& taskname);
+	void StartTask();
+	void StopTask();
+	void PauseTask();
+	void ResumeTask();
 	virtual void timeout();
-
+	static Mutex m_InstLock;
+	Mutex m_CallLock;
+	int m_count;
 };
+
 
 /* 处理fs回传消息中心， 使用线程池管理FSsession*/
 class FSprocess :public Threadbase
 {
 public:
-	FSprocess():m_slienceCheck(1)
+	FSprocess()
 	{
 		//SessionPool.initsimplePool();
 		//SessionPool.startPool();
@@ -180,27 +221,23 @@ public:
 	void Initability();
 	virtual void run();
 	void startProcess();
-	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime);
+//	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime);
 	void *Inbound_Init(void *arg);
 	static void *test_Process(void *arg);
 	void  process_event(esl_handle_t *handle,
 				   esl_event_t *event,
 				   map<string,base_script_t>& keymap,vector<base_knowledge_t>&knowledgelib);
-	static esl_handle_t* getSessionhandle(){return m_sessionHandle;}
-	FSsession* GetSessionbychannelid(string channel);
-	FSsession*GetSessionbymainUUID(string strmainid);
 
+	int getRoboteNum();
 	static map<string, base_script_t> m_gKeymap;
 	static vector<base_knowledge_t>m_knowledgeSet;
-//xthreadPool SessionPool;
-	static map<string,FSsession*> m_SessionSet;
-	static esl_handle_t* m_sessionHandle;
-	static xMutex m_sessionlock;
+
 	string m_fsip;
 	int m_fsPort;
 	string m_fsPassword;
 	static string m_recordPath;
-	slienceCheck m_slienceCheck;
+	//slienceCheck m_slienceCheck;
 	static int m_userSetsilenseTime;
+	static int m_robotNum;
 };
 

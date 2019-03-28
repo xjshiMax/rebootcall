@@ -15,6 +15,7 @@ public:
 	static bool SelectSqlAllSC(map<string,base_script_t>& vSpeech);
 	static bool GetKnowledge(vector<base_knowledge_t>&knowledgelib);
 	static bool GetnumberList(vector<t_Userinfo>&numberlist,string taskid);
+	static bool Getcallability(int&robotenum,int& recalltimes,string taskid);
 	static bool InsertSessionRe(string insertsql);
 
 };

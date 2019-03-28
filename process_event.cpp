@@ -69,7 +69,11 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 }
 void FSsession::collection(string name,string Text,int node)
 {
-	m_SessionWord+=name+": ";
+	esl_log(ESL_LOG_INFO,"collection\n");
+	LONGLONG time=GetUTCtimestamp();
+	char strtime[32]={0};
+	sprintf(strtime,"%d",time);
+	m_SessionWord+=name+"("+string(strtime)+"): ";
 	m_SessionWord+=Text;
 	m_SessionWord+="\r\n";
 	if(node!=-1)
@@ -77,8 +81,10 @@ void FSsession::collection(string name,string Text,int node)
 }
 void FSsession::silenceAdd(int val)
 {
-	esl_log(ESL_LOG_INFO,"silenceAdd,val=%d\n",val);
+	//esl_log(ESL_LOG_INFO,"silenceAdd,val=%d\n",val);
 	xAutoLock l(m_silenceLock);
+	if(m_silencestatus==Session_noanswar)
+		return;
 	if(m_playbackstatus==Session_playing)
 	{
 		esl_log(ESL_LOG_INFO,"silenceAdd,Session_playing\n");
@@ -92,9 +98,9 @@ void FSsession::silenceAdd(int val)
 }
 bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
 {
-	esl_log(ESL_LOG_INFO,"CheckoutIfsilence\n");
+	//esl_log(ESL_LOG_INFO,"CheckoutIfsilence\n");
 	xAutoLock l(m_silenceLock);
-	if(m_silenceTime+1>=m_maxsilenceTime)
+	if(m_silenceTime>=m_maxsilenceTime)
 	{
 		m_silenceTime=0;
 		return true;
@@ -104,6 +110,12 @@ bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
 }
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
+	if(m_silencestatus==Session_silencefirst)	//如果前面检测到静音，下一句无条件重复上一个节点
+	{
+		int listsize=m_nodelist.size();
+		if(listsize>=1)
+			return m_nodelist[listsize-1];
+	}
 	if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
 	{
 		m_SessionState=GF_normal_node;
@@ -254,6 +266,9 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 }
 void FSsession::Onanswar()
 {
+// 	m_silencestatusLock.lock();
+// 	m_silencestatus=Session_nosilence;
+// 	m_silencestatusLock.unlock();
 	char tmp_cmd[1024] = {0};
 	string recordpath=Getrecordpath();
 	char filename[64];
@@ -263,7 +278,7 @@ void FSsession::Onanswar()
 	char onlyfilename[64]={0};
 	tblock = localtime(&timer);
 	sprintf(strtime,"%04d%02d%02d%02d%02d%02d",tblock->tm_year+1900,tblock->tm_mon+1,tblock->tm_mday,tblock->tm_hour,tblock->tm_min,tblock->tm_sec);
-	sprintf(onlyfilename,"%s_%s.wav",caller_id.c_str(),strtime);
+	sprintf(onlyfilename,"%s_%s.wav",destination_number.c_str(),strtime);
 	sprintf(filename,"%s/%s",recordpath.c_str(),onlyfilename);
 	//sprintf(filename,"%s/0000000000_1551959350.wav",recordpath.c_str(),GetUTCtimestamp());
 	esl_log(ESL_LOG_INFO, "record file name:%s\n", filename);
@@ -293,9 +308,9 @@ void FSsession::Onsilence()
 	{
 	case Session_nosilence:
 		{
-			m_silencestatusLock.lock();
+			xAutoLock L(m_silencestatusLock);
 			m_silencestatus=Session_silencefirst;
-			m_silencestatusLock.unlock();
+		//	m_silenceTime=0;
 			m_IsAsr=false;
 			map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 			char strcmdSCID[32]={0};
@@ -305,13 +320,12 @@ void FSsession::Onsilence()
 			{
 				base_script_t node = iter->second;
 				node.vox_base += ".wav";
-				printf("100 stop_asr uuid:%s",strUUID.c_str());
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
-				collection("机器人",node.desc,0);
+				collection("机器人",node.desc,-1);
 				//	m_DB_talk_times+=1;
-				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",0);
-				LOG(INFO)<<"playback the Onsilence ,nodeState:"<<0;
+				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:0 \n");
+			//	LOG(INFO)<<"playback the Onsilence ,nodeState:0";
 
 			}
 			else
@@ -322,9 +336,8 @@ void FSsession::Onsilence()
 		break;
 	case Session_silencefirst:
 		{
-			m_silencestatusLock.lock();
+			xAutoLock L(m_silencestatusLock);
 			m_silencestatus=Session_silenceSecond;
-			m_silencestatusLock.unlock();
 			m_IsAsr=false;
 			map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 			char strcmdSCID[32]={0};
@@ -337,10 +350,10 @@ void FSsession::Onsilence()
 				printf("100 stop_asr uuid:%s",strUUID.c_str());
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
-				collection("机器人",node.desc,0);
+				collection("机器人",node.desc,-1);
 				//	m_DB_talk_times+=1;
-				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",0);
-				LOG(INFO)<<"playback the Onsilence ,nodeState:"<<0;
+				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState 0 \n");
+			//	LOG(INFO)<<"playback the Onsilence ,nodeState:0"<<;
 
 
 
@@ -361,6 +374,7 @@ void FSsession::Onsilence()
 }
 void FSsession::Action()
 {
+	xAutoLock l(m_databaselock);
 	string event_subclass, contact, from_user;
 	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	vector<base_knowledge_t> knowledgeset=FSprocess::m_knowledgeSet;
@@ -372,20 +386,20 @@ void FSsession::Action()
 
 	case ESL_EVENT_CUSTOM:
 	{
-		event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
-		contact = esl_event_get_header(event, "contact") ? esl_event_get_header(event, "contact") : "";
-		from_user = esl_event_get_header(event, "from-user") ? esl_event_get_header(event, "from-user") : "";
-
-		if (event_subclass == "sofia::register")
-		{
-
-			esl_log(ESL_LOG_INFO, "sofia::register  %s, %d event_subclass=%s, contact=%s, from-user=%s\n", __FILE__, __LINE__, event_subclass.c_str(), contact.c_str(), from_user.c_str());
-		}
-		else if (event_subclass == "sofia::unregister")
-		{
-		}
-		else if (event_subclass == "asr")
-		{
+// 		event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
+// 		contact = esl_event_get_header(event, "contact") ? esl_event_get_header(event, "contact") : "";
+// 		from_user = esl_event_get_header(event, "from-user") ? esl_event_get_header(event, "from-user") : "";
+// 
+// 		if (event_subclass == "sofia::register")
+// 		{
+// 
+// 			esl_log(ESL_LOG_INFO, "sofia::register  %s, %d event_subclass=%s, contact=%s, from-user=%s\n", __FILE__, __LINE__, event_subclass.c_str(), contact.c_str(), from_user.c_str());
+// 		}
+// 		else if (event_subclass == "sofia::unregister")
+// 		{
+// 		}
+// 		else if (event_subclass == "asr")
+// 		{
 			string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);
 			LOG(INFO)<<"asrResp="<<asrResp;
@@ -416,9 +430,10 @@ void FSsession::Action()
 			if(m_IsAsr)
 			{
 				m_IsAsr=false;
-				m_silencestatusLock.lock();
-				m_silencestatus=Session_nosilence;
-				m_silencestatusLock.unlock();
+// 				m_silencestatusLock.lock();
+// 				m_silencestatus=Session_nosilence;
+// 				silenceAdd(Session_resetsilence);
+// 				m_silencestatusLock.unlock();
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
 				collection("客户",asrResp);
 				string asrText=asrParstText;
@@ -501,6 +516,10 @@ void FSsession::Action()
 					m_SessionState|=GF_knowledge_node;
 				}
 				SetFinnallabel(nodeState,nextstate);
+				m_silencestatusLock.lock();
+				m_silencestatus=Session_nosilence;
+				silenceAdd(Session_resetsilence);
+				m_silencestatusLock.unlock();
 				switch(nextstate)
 				{
 				case SC_Opening_Remarks:
@@ -557,6 +576,7 @@ void FSsession::Action()
 						nodeState=SC_Hungup;
 						esl_log(ESL_LOG_INFO, "call hangup ,nextstat:%d \n",nextstate);
 						esl_execute(handle, "hangup", NULL, a_uuid.c_str());
+						m_DB_hungup="robot_hangup";
 						return;
 					}
 				default:
@@ -599,7 +619,7 @@ void FSsession::Action()
 				//m_IsAsr=true;
 				return;
 			}//m_IsAsr
-			}//asr
+		//	}//asr
 
 			// esl_execute(handle, "stop_asr", NULL, strUUID.c_str());
 		}//case custom
@@ -611,7 +631,7 @@ void FSsession::Action()
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
-		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
+		//destination_number = esl_event_get_header(event, "Caller-Destination-Number")? esl_event_get_header(event, "Caller-Destination-Number") : "";
 		string is_callout, a_leg_uuid;
 		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : "";
 		const char *eventbody = esl_event_get_body(event);
@@ -625,12 +645,11 @@ void FSsession::Action()
 	{
 
 		//???????
-		string is_callout, a_leg_uuid;
-		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
-		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
-		string createTime = esl_event_get_header(event, "Caller-Channel-Created-Time") ? esl_event_get_header(event, "Caller-Channel-Created-Time") : "";
-
-		a_leg_uuid = esl_event_get_header(event, "variable_origination_uuid") ? esl_event_get_header(event, "variable_origination_uuid") : "";
+// 		string is_callout, a_leg_uuid;
+// 		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+// 		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
+// 		string createTime = esl_event_get_header(event, "Caller-Channel-Created-Time") ? esl_event_get_header(event, "Caller-Channel-Created-Time") : "";
+// 		a_leg_uuid = esl_event_get_header(event, "variable_origination_uuid") ? esl_event_get_header(event, "variable_origination_uuid") : "";
 
 		break;
 	}
@@ -762,8 +781,8 @@ void FSsession::Action()
 		//????????????
 		//uuid = esl_event_get_header(event, "Caller-Unique-ID");
 		//a_uuid = esl_event_get_header(event, "variable_a_leg_uuid");
-		destination_number = esl_event_get_header(event, "Caller-Destination-Number");
-		strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+	//	destination_number = esl_event_get_header(event, "Caller-Destination-Number")? esl_event_get_header(event, "Caller-Destination-Number") : "";
+	//	strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
 		string is_callout, a_leg_uuid;
 		is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
 		{
@@ -782,13 +801,16 @@ void FSsession::Action()
 			{
 				esl_log(ESL_LOG_INFO, "handup Result is keyword :%s\n", keyword.c_str());
 				esl_execute(handle, "hangup", NULL, strUUID.c_str());
+				m_DB_hungup="robot_hangup";
 				break;
 			}
 		}
 		if(m_silencestatus==Session_silenceSecond)
 		{
+			m_IsAsr=false;
 			esl_log(ESL_LOG_INFO, " m_silencestatus:Session_silenceSecond\n");
 			esl_execute(handle, "hangup", NULL, strUUID.c_str());
+			m_DB_hungup="robot_hangup";
 			break;
 		}
 		break;
@@ -851,9 +873,9 @@ void FSsession::InsertSessionResult()
 {
 	//SetFinnallabel();
 	char querysql[4096]={0};
-	string strsql="Insert into call_cdr_tbl (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at,username,sessiontext)values ";
-	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d,'%s','%s')",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
-		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at,m_username.c_str(),m_SessionWord.c_str());
+	string strsql="Insert into call_cdr_tbl (inbound_talk_times, caller_id_number, destination_number, start_stamp, end_stamp, duration, recording_file, task_name, outbound_label, task_id, created_at, updated_at,username,sessiontext,whohangup)values ";
+	sprintf(querysql,"%s(%d,'%s','%s','%s','%s',%d,'%s','%s','%s',%d,%d,%d,'%s','%s','%s')",strsql.c_str(),m_DB_talk_times,caller_id.c_str(),destination_number.c_str(),m_DB_start_stamp.c_str(),m_DB_end_stamp.c_str(),m_DB_duration,
+		m_DB_recording_file.c_str(),m_DB_task_name.c_str(),m_DB_outbound_label.c_str(),atoi(m_taskID.c_str()),m_DB_creatd_at,m_DB_updated_at,m_username.c_str(),m_SessionWord.c_str(),m_DB_hungup.c_str());
 	esl_log(ESL_LOG_INFO,"insert the session redcord:%s\n",querysql);
 	//db_operator_t::initDatabase();
 	//m_databaselock.lock();
@@ -888,13 +910,14 @@ string FSsession::Getrecordpath()
 }
 void FScall::run()
 {
-	GetnumbrList();
 	LauchFScall();
 }
 int FScall::GetnumbrList()
 {
 	  //db_operator_t::initDatabase();
-	  db_operator_t::GetnumberList(m_NumberSet,m_taskID);
+	 db_operator_t::GetnumberList(m_NumberSet,m_taskID);
+	 db_operator_t::Getcallability(m_robotNum,m_recallTimes,m_taskID);
+	 esl_log(ESL_LOG_INFO,"FScall::GetnumbrList,m_robotNum=%d,m_recallTimes=%d\n",m_robotNum,m_recallTimes);
 	  return 0;
 }
 void FScall::Initability()
@@ -966,6 +989,37 @@ bool FScall::Getablibity(string jsonstr)
 	cJSON_Delete(root);
 	return true;
 }
+void FScall::StopTask()
+{
+	m_stop=true;
+	m_IsAllend=true;
+	m_CallStatus=CallStop;
+	m_recallTimes=0;
+	xAutoLock l(m_sessionlock);
+	m_Sessioncond.signal();
+}
+void FScall::PauseTask()
+{
+	if(m_CallStatus==CallStop)
+		return;
+	m_stop=true;
+	m_CallStatus=CallPause;
+	xAutoLock l(m_sessionlock);
+	m_Sessioncond.signal();
+
+}
+void FScall::ResumeTask()
+{
+	if(m_CallStatus!=CallPause)
+		return;
+	m_CallStatus=CallResume;
+	m_stop=false;
+	xAutoLock l(m_sessionlock);
+	m_Sessioncond.signal();
+	start();
+	//LauchFScall();
+
+}
 int FScall::LauchFScall()
 {
 	if(m_taskID==""||m_speechcraftID=="suninfo_task")
@@ -985,19 +1039,36 @@ int FScall::LauchFScall()
         esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
         exit(1);
     }
-	//esl_send_recv(&handle, "bgapi originate {speechCraftID=12344321,taskID=1111,taskname=banksale}user/1006 &park()");
-    //esl_send_recv(&handle, "bgapi originate user/1003 &park()");
 	char callCmd[256];
 	vector<t_Userinfo>::iterator ite=m_NumberSet.begin();
+	if(m_CallStatus==CallInit||m_CallStatus==Recall)
+		m_pPauseIte=m_NumberSet.begin();
+	if(m_CallStatus==CallResume)
+		ite=m_pPauseIte;
+	m_CallStatus=CallStart;
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
-	while(ite!=m_NumberSet.end())
+	int NumCancall=m_robotNum;
+	while(ite!=m_NumberSet.end()&&!m_stop)
 	{
-		sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		//xAutoLock L(m_sessionlock);
+		if(NumCancall<=0)
+		{
+			xAutoLock L(m_sessionlock);
+			esl_log(ESL_LOG_INFO,"FSprocess::m_Sessioncond.wait,m_robotNum=%d\n",m_robotNum);
+			esl_log(ESL_LOG_INFO,"NumCancall:%d\n",NumCancall);
+			m_Sessioncond.wait(m_sessionlock);
+			NumCancall=m_robotNum-m_SessionSet.size();
+		}
+		//originate_time
+		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=40,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
-		esl_log(ESL_LOG_INFO,"callCmd:%s\n",callCmd);
-		sleep(1);
+		esl_log(ESL_LOG_INFO,"callCmd:%s,FSprocess::m_SessionSet.size()=%d\n",callCmd,m_SessionSet.size()); 
+		--NumCancall;
+		maxCallout++;
+		esl_log(ESL_LOG_INFO,"NumCancall:%d\n",NumCancall);
 		ite++;
+		m_pPauseIte=ite;
 	}
     if (handle.last_sr_event && handle.last_sr_event->body)
     {
@@ -1007,47 +1078,17 @@ int FScall::LauchFScall()
     {
         printf("[%s] last_sr_reply\n", handle.last_sr_reply);
     }
-	m_IsAllend=true;
+	if(!m_stop)
+	{
+		m_IsAllend=true;
+		m_CallStatus=CallStop;
+	}
 	return 0;
 }
-
-void FScallManager::CheckEndCall()
+void FScall::Checksilence()
 {
-	map<string,FScall*>::iterator CheckIte=m_TaskSet.begin();
-	while(CheckIte!=m_TaskSet.end())
-	{
-		FScall*pcall=CheckIte->second;
-		if(pcall==NULL)
-		{
-			 m_TaskSet.erase(CheckIte++);
-			 continue;
-		}
-		if(pcall->m_IsAllend)
-		{
-			 m_TaskSet.erase(CheckIte++);
-			 delete pcall;
-			 pcall=NULL;
-			 continue;
-		}
-		else
-		{
-			CheckIte++;
-		}
-	}
-}
-slienceCheck::slienceCheck(int timeout):OnTimerBase(timeout)
-{
-
-}
-slienceCheck::~slienceCheck()
-{
-
-}
-void slienceCheck::timeout()
-{
-	xAutoLock L(FSprocess::m_sessionlock);
-	map<string,FSsession*>::iterator ite=FSprocess::m_SessionSet.begin();
-	while(ite!=FSprocess::m_SessionSet.end())
+	map<string,FSsession*>::iterator ite=m_SessionSet.begin();
+	while(ite!=m_SessionSet.end())
 	{
 		FSsession*p=ite->second;
 		if(p)
@@ -1059,17 +1100,444 @@ void slienceCheck::timeout()
 				p->Onsilence();
 			}
 		}
-		
+
 		ite++;
 	}
 }
+int FScall::reLauchFSCall()
+{
+	if(m_CallStatus==Recall&&FinishCreateAllSession()&&m_recallTimes>0)
+	{
+		esl_log(ESL_LOG_INFO,"-----************-----reLauchFSCall m_CallStatus=%d,m_notAnswerSet=%d\n",m_CallStatus,m_notAnswerSet.size());
+		m_recallTimes--;
+		m_pPauseIte=m_NumberSet.end();
+		m_IsAllend=false;
+		maxSessionDestory=0;
+		m_NumberSet.assign(m_notAnswerSet.begin(),m_notAnswerSet.end()); 
+		m_notAnswerSet.clear();
+		esl_log(ESL_LOG_INFO,"m_NumberSet.size()=%d,m_notAnswerSet=%d\n",m_NumberSet.size(),m_notAnswerSet.size());
+		start();
+	}
+}
+FSsession* FScall::GetSessionbychannelid(string channel)
+{
+	//sofia/internal/1006@192.168.2.143:35423
+	//xAutoLock L(m_sessionlock);
+	string tempchannel=channel;
+	string callednumber=tempchannel.substr(0,tempchannel.find_first_of("@"));
+	callednumber=callednumber.erase(0,callednumber.find_last_of("/")+1);
+	map<string,FSsession*>::iterator ite=m_SessionSet.begin();
+	while(ite!=m_SessionSet.end())
+	{
+		if((ite->second)->destination_number==callednumber)
+		{
+			return ite->second;
+		}
+		ite++;
+	}
+	return NULL;
+}
+FSsession*FScall::GetSessionbymainUUID(string& strmainid)
+{
+	map<string,FSsession*>::iterator ite=m_SessionSet.find(strmainid);
+	if(ite!=m_SessionSet.end())
+		return ite->second;
+	else
+		return NULL;
+}
+FSsession* FScall::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime)
+{
+	FSsession* psession=new FSsession;
+	psession->m_taskID=strtaskID;
+	psession->m_speeckCraftID=strscraftID;
+	psession->strUUID = strUUID;
+	psession->caller_id=caller_id;
+	psession->destination_number=destination_number;
+	psession->SetSessionID(strUUID);
+	psession->handle=handle;
+	psession->event=event;
+	psession->m_DB_task_name=taskname;
+	psession->m_DB_creatd_at = psession->GetUTCtimestamp();
+	psession->m_DB_start_stamp=psession->Getcurrenttime();
+	psession->m_DB_updated_at=0;
+	psession->m_username=username;
+	psession->m_maxsilenceTime=silenceTime;
+	return psession;
+}
+
+void FScall::CallEvent_handle(esl_handle_t *handle,
+	esl_event_t *event,
+	map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
+{
+	char tmp_cmd[1024] = {0};
+	string strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+	string caller_id = esl_event_get_header(event, "Caller-Caller-ID-Number") ? esl_event_get_header(event, "Caller-Caller-ID-Number") : "";
+	string destination_number = esl_event_get_header(event, "Caller-Destination-Number") ? esl_event_get_header(event, "Caller-Destination-Number") : "";
+	string strscraftID=esl_event_get_header(event, "Variable_speechCraftID") ? esl_event_get_header(event, "Variable_speechCraftID") : "";
+	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
+	string strtaskname=esl_event_get_header(event, "Variable_taskname") ? esl_event_get_header(event, "Variable_taskname") : "";
+	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
+	string strusername=esl_event_get_header(event, "Variable_username") ? esl_event_get_header(event, "Variable_username") : "";
+	switch (event->event_id)
+	{
+	case ESL_EVENT_CUSTOM:
+		{
+			xAutoLock l(m_sessionlock);
+			string event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
+			if (event_subclass == "asr")
+			{
+				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
+				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
+				const char *eventbody = esl_event_get_body(event);
+				esl_log(ESL_LOG_INFO, "eventbody=%s\n", eventbody);
+				string coreuuid = esl_event_get_header(event, "Core-UUID") ? esl_event_get_header(event, "Core-UUID") : "";
+				esl_log(ESL_LOG_INFO, "coreuuid=%s\n", coreuuid.c_str());
+				string Channel = esl_event_get_header(event, "Channel") ? esl_event_get_header(event, "Channel") : "";
+				string strmainUUID = esl_event_get_header(event, "mainUUID") ? esl_event_get_header(event, "mainUUID") : "";
+				esl_log(ESL_LOG_INFO, "Channel=%s\n", Channel.c_str());
+				FSsession*psession = GetSessionbymainUUID(strmainUUID);
+				esl_log(ESL_LOG_INFO, "strmainUUID=%s\n", strmainUUID.c_str());
+				esl_log(ESL_LOG_INFO,"find the session by channel\n");
+				if(psession!=NULL)
+				{
+					esl_log(ESL_LOG_INFO,"get the right sesson by id \n");
+					psession->handle=handle;
+					psession->event=event;
+					psession->Action();
+				}
+			}
+
+		}
+		break;
+	case ESL_EVENT_CHANNEL_ORIGINATE: //创建会话
+		{
+			xAutoLock l(m_sessionlock);
+			esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ORIGINATE call in uuid:%s \n", strUUID.c_str());
+			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname,strusername,FSprocess::m_userSetsilenseTime);
+			if(psession==NULL)
+			{
+				esl_log(ESL_LOG_INFO,"CreateSession failed\n");
+				return ;
+			}
+			m_SessionSet[strUUID]=psession;
+		}
+		break;
+	case ESL_EVENT_CHANNEL_ANSWER: 
+		{
+			xAutoLock l(m_sessionlock);
+			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
+			if(ite!=m_SessionSet.end())
+			{
+				FSsession*psession=ite->second;
+				char asrparam[256]={0};
+#ifdef _Use_ALI_SDK
+				sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
+#else
+				sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
+#endif
+				esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
+				LOG(INFO)<<"create a session:"<<strUUID;
+				psession->handle=handle;
+				psession->event=event;
+				psession->Onanswar();
+				esl_status_t t = esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
+				esl_log(ESL_LOG_INFO, "start_asr:%d \n", t);
+				psession->m_silencestatusLock.lock();
+				psession->m_silencestatus=Session_nosilence;
+				psession->m_silencestatusLock.unlock();
+			}
+
+		}
+		break;
+	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
+		{
+			xAutoLock l(m_sessionlock);
+			string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
+			string hangupTime = esl_event_get_header(event, "Caller-Channel-Hangup-Time") ? esl_event_get_header(event, "Caller-Channel-Hangup-Time") : "";
+			string recordFileName = esl_event_get_header(event, "variable_record_filename") ? esl_event_get_header(event, "variable_record_filename") : "";
+			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
+			if(ite!=m_SessionSet.end())
+			{
+				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", strUUID.c_str());
+				FSsession*psession=ite->second;
+				m_SessionSet.erase(strUUID);
+				if(psession!=NULL)
+				{
+					if(psession->m_silencestatus==Session_noanswar)//这里表示未接通
+					{
+						t_Userinfo userinfo; 
+						userinfo.phonenum=psession->caller_id;
+						userinfo.username=psession->m_username;
+						m_notAnswerSet.push_back(userinfo);
+						esl_log(ESL_LOG_INFO,"m_notAnswerSet.size()=%d\n",m_notAnswerSet.size());
+					}
+					//m_sessionlock.lock();
+					esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+					//m_sessionlock.unlock();
+					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
+					psession->InsertSessionResult();
+					esl_log(ESL_LOG_INFO,"call stop_asr uuid:%s\n",(psession->strUUID).c_str());
+					delete psession;
+				}
+				LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
+			}
+			if(m_SessionSet.size()<m_robotNum)
+			{
+				m_Sessioncond.signal();
+				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER signal \n");
+			}
+			maxSessionDestory++;
+		}
+		break;
+	default:
+		{
+			xAutoLock l(m_sessionlock);
+			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
+			if(ite!=m_SessionSet.end())
+			{
+				FSsession*psession=m_SessionSet[strUUID];
+				if(psession!=NULL)
+				{
+					psession->handle=handle;
+					psession->event=event;
+					psession->Action();
+				}
+			}
+		}
+		break;
+	}
+}
+Mutex FScallManager::m_InstLock;
+FScallManager* FScallManager::Instance()
+{
+	m_InstLock.lock();
+	static FScallManager _manager(1);
+	m_InstLock.unlock();
+	return &_manager;
+}
+void FScallManager::timeout()
+{
+	//xAutoLock L(m_InstLock);
+	map<string,FScall*>::iterator ite=m_TaskSet.begin();
+	while(ite!=m_TaskSet.end())
+	{
+		FScall*pcall=ite->second;
+		if(!pcall){ite++;continue;}
+		pcall->Checksilence();
+		ite++;
+	}	
+	if(m_count%100==0)
+	{
+		CheckEndCall();
+	}
+	m_count++;
+}
+void FScallManager::CheckEndCall()
+{
+	xAutoLock L(m_CallLock);
+	map<string,FScall*>::iterator CheckIte=m_TaskSet.begin();
+	while(CheckIte!=m_TaskSet.end())
+	{
+		FScall*pcall=CheckIte->second;
+		if(pcall==NULL)
+		{
+			 m_TaskSet.erase(CheckIte++);
+			 continue;
+		}
+		if(pcall->m_IsAllend&& pcall->m_SessionSet.empty()&&pcall->FinishCreateAllSession())
+		{
+			if(pcall->m_recallTimes<=0)
+			{
+				esl_log(ESL_LOG_INFO,"********delete call\n");
+				m_TaskSet.erase(CheckIte++);
+				delete pcall;
+				pcall=NULL;
+			}
+			else
+			{
+				pcall->m_CallStatus=Recall;
+				pcall->reLauchFSCall();
+				CheckIte++;
+			}
+			 continue;
+		}
+		else
+		{
+			CheckIte++;
+		}
+	}
+}
+FScall*FScallManager::GetFSCallbyUUID(string& struuid)
+{
+	map<string,FScall*>::iterator ite=m_TaskSet.begin();
+	while(ite!=m_TaskSet.end())
+	{
+		FScall*pcall=ite->second;
+		if(!pcall){ite++;continue;}
+		FSsession* psession=pcall->GetSessionbymainUUID(struuid);
+		if(psession)
+			return pcall;
+		ite++;
+	}
+	return NULL;
+}
+void FScallManager::HandleMessage(string data)
+{
+	string cmd;
+	string scid;
+	string taskid;
+	string taskname;
+	if(!ParseData(data,cmd,scid,taskid,taskname))
+		return;
+	esl_log(ESL_LOG_INFO,"::::cmd:%s\n",cmd.c_str());
+	if(cmd=="start")  //开始任务或者重新开始
+	{
+		map<string,FScall*>::iterator ite=m_TaskSet.find(taskid);
+		if(ite!=m_TaskSet.end())
+		{
+			FScall*pcall=ite->second;
+			pcall->StopTask();
+			m_TaskSet.erase(ite);
+			m_TaskSet.insert(pair<string,FScall*>(pcall->m_taskID+"deleted",pcall));
+		}
+		FScall* Onecall=new FScall;
+		Onecall->Initability();
+		if (!Onecall->Getablibity(data))
+			return ;
+		//Onecall->maxSessionCreate=0;
+		Onecall->GetnumbrList();
+		Onecall->start();
+		m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
+	}
+	else if(cmd=="pause")	//暂停任务
+	{
+		map<string,FScall*>::iterator ite=m_TaskSet.find(taskid);
+		if(ite!=m_TaskSet.end())
+		{
+			FScall*pcall=ite->second;
+			pcall->PauseTask();
+		}
+	}
+	else if(cmd=="resume")	//恢复
+	{
+		map<string,FScall*>::iterator ite=m_TaskSet.find(taskid);
+		if(ite!=m_TaskSet.end())
+		{
+			FScall*pcall=ite->second;
+			pcall->ResumeTask();
+		}
+	}
+	else if(cmd=="stop")
+	{
+		map<string,FScall*>::iterator ite=m_TaskSet.find(taskid);
+		if(ite!=m_TaskSet.end())
+		{
+			FScall*pcall=ite->second;
+			pcall->StopTask();
+			m_TaskSet.erase(ite);
+			m_TaskSet.insert(pair<string,FScall*>(pcall->m_taskID+"deleted",pcall));
+		}
+	}
+}
+void FScallManager::CallEvent_handle(esl_handle_t *handle,
+	esl_event_t *event,
+	map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
+{
+	//xAutoLock L(m_CallLock);
+	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
+	string strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
+	map<string ,FScall*>::iterator callite=m_TaskSet.find(strtaskID);
+	if(callite!=m_TaskSet.end())
+	{
+		//xAutoLock L(m_CallLock);
+		FScall*pcall=callite->second;
+		if(pcall)
+			pcall->CallEvent_handle( handle,event,keymap,knowledgelib);
+	}
+	else
+	{
+		//语音消息使用uuid寻找对应的fscall
+		switch (event->event_id)
+		{
+		case ESL_EVENT_CUSTOM:
+			{
+				string event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
+				if (event_subclass == "asr")
+				{
+					//xAutoLock L(m_CallLock);
+					string strmainUUID = esl_event_get_header(event, "mainUUID") ? esl_event_get_header(event, "mainUUID") : "";
+					esl_log(ESL_LOG_INFO, "mainUUID=%s\n", strmainUUID.c_str());
+					FScall*pcall = GetFSCallbyUUID(strmainUUID);
+					if(pcall)
+					{
+						esl_log(ESL_LOG_INFO, "find fscall by mainuuid\n" );
+						pcall->CallEvent_handle( handle,event,keymap,knowledgelib);
+					}
+				}
+
+
+
+			}
+
+		}
+	}
+}
+bool FScallManager::ParseData(string jsonstr,string& cmd,string& scid,string& taskid,string& taskname)
+{
+	cJSON *root = cJSON_Parse(jsonstr.c_str());
+	if(root==0)
+	{
+		esl_log(ESL_LOG_INFO,"please send correct json data \n");
+		return false;
+	}
+	cJSON* item=root->child;
+	char p[16]={0};
+	cJSON *cscmd=cJSON_GetObjectItem(root,"txcallcmd");
+	if(cscmd)
+	{
+		cmd=cscmd->valuestring;
+	}
+	else
+	{
+		esl_log(ESL_LOG_INFO,"json not include a cmd\n");
+		return false;
+	}
+	cJSON *cspeechcid=cJSON_GetObjectItem(root,"speechCraftID");
+	if(cspeechcid)
+	{
+		sprintf(p,"%d",cspeechcid->valueint);
+		scid=p;
+	}
+	else
+		scid="";
+	cJSON *ctaskid=cJSON_GetObjectItem(root,"taskID");
+	if(ctaskid)
+	{
+		memset(p,0,16);
+		sprintf(p,"%d",ctaskid->valueint);
+		taskid=p;
+	}
+	else
+	{
+		taskid="";
+		esl_log(ESL_LOG_INFO,"can not find 'taskID' in json data\n");
+		return false;
+	}
+	cJSON*ctaskname=cJSON_GetObjectItem(root,"taskName");
+	if(ctaskname)
+		taskname=ctaskname->valuestring;
+	else
+		taskname="suninfo_task";
+	esl_log(ESL_LOG_INFO,"get the ability:cmd:%s,m_speechcraft:%s,m_taskid:%s,m_taskname=%s\n",cmd.c_str(),scid.c_str(),taskid.c_str(),taskname.c_str());
+	cJSON_Delete(root);
+	return true;
+}
+
 map<string, base_script_t> FSprocess::m_gKeymap;
 vector<base_knowledge_t>FSprocess::m_knowledgeSet;
-map<string,FSsession*> FSprocess::m_SessionSet;
-esl_handle_t* FSprocess::m_sessionHandle=NULL;
 string FSprocess::m_recordPath="/home/path";
-xMutex FSprocess::m_sessionlock;
 int FSprocess::m_userSetsilenseTime;
+int FSprocess::m_robotNum=10;
 void FSprocess::Initability()
 {
 	IniFile IniService;
@@ -1104,70 +1572,27 @@ void FSprocess::Initability()
 	{
 		m_userSetsilenseTime=7;
 	}
+	iret=-1;
+	m_robotNum=IniService.getIntValue("PROCESS","ROBOTNUM",iret);
+	if(iret!=0)
+	{
+		m_robotNum=10;
+	}
 }
 void FSprocess::startProcess()
 {
 	Initability();
 	start();
-	m_slienceCheck.start();
+
 }
 void FSprocess::run()
 {
 	Inbound_Init((void*)"userinfo");
 }
-FSsession* FSprocess::CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime)
+
+int FSprocess::getRoboteNum()
 {
-	FSsession* psession=new FSsession;
-	psession->m_taskID=strtaskID;
-	psession->m_speeckCraftID=strscraftID;
-	psession->strUUID = strUUID;
-	psession->caller_id=caller_id;
-	psession->destination_number=destination_number;
-	psession->SetSessionID(strUUID);
-	psession->handle=handle;
-	psession->event=event;
-	psession->m_DB_task_name=taskname;
-	psession->m_DB_creatd_at = psession->GetUTCtimestamp();
-	psession->m_DB_start_stamp=psession->Getcurrenttime();
-	psession->m_DB_updated_at=0;
-	psession->m_username=username;
-	psession->m_maxsilenceTime=silenceTime;
-	return psession;
-}
-FSsession* FSprocess::GetSessionbychannelid(string channel)
-{
-	//sofia/internal/1006@192.168.2.143:35423
-	//xAutoLock L(m_sessionlock);
-	string tempchannel=channel;
-	string callednumber=tempchannel.substr(0,tempchannel.find_first_of("@"));
-	callednumber=callednumber.erase(0,callednumber.find_last_of("/")+1);
-	map<string,FSsession*>::iterator ite=m_SessionSet.begin();
-	while(ite!=m_SessionSet.end())
-	{
-		if((ite->second)->destination_number==callednumber)
-		{
-// 			if((ite->second)->m_channelpath!="") //已经有一个语音通道了
-// 			{
-// 				ite++;
-// 				continue;
-// 			}
-// 			else
-//			{
-//				(ite->second)->m_channelpath=channel;
-//			}
-			return ite->second;
-		}
-		ite++;
-	}
-	return NULL;
-}
-FSsession*FSprocess::GetSessionbymainUUID(string strmainid)
-{
-	map<string,FSsession*>::iterator ite=m_SessionSet.find(strmainid);
-	if(ite!=m_SessionSet.end())
-		return ite->second;
-	else
-		return NULL;
+
 }
 void *FSprocess::Inbound_Init(void *arg)
 {
@@ -1186,7 +1611,7 @@ void *FSprocess::Inbound_Init(void *arg)
         esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
         exit(1);
     }
-	m_sessionHandle=&handle;
+//	m_sessionHandle=&handle;
 	//esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0","");
     esl_log(ESL_LOG_INFO, "Connected to FreeSWITCH\n");
   //  esl_events(&handle, ESL_EVENT_TYPE_PLAIN,
@@ -1202,6 +1627,7 @@ void *FSprocess::Inbound_Init(void *arg)
         if (handle.last_ievent)
         {
             process_event(&handle, handle.last_ievent, m_gKeymap,m_knowledgeSet);
+		//	handle.last_ievent=NULL;
         }
 		//esl_log(ESL_LOG_INFO,"status=%d,--------\n",status);
     }
@@ -1253,125 +1679,10 @@ void *FSprocess::Inbound_Init(void *arg)
 void FSprocess::process_event(esl_handle_t *handle,
 				   esl_event_t *event,
 				    map<string, base_script_t> &keymap,vector<base_knowledge_t>&knowledgelib)
-{
-	char tmp_cmd[1024] = {0};
-	string strUUID = esl_event_get_header(event, "Caller-Unique-ID") ? esl_event_get_header(event, "Caller-Unique-ID") : "";
-	string caller_id = esl_event_get_header(event, "Caller-Caller-ID-Number") ? esl_event_get_header(event, "Caller-Caller-ID-Number") : "";
-	string destination_number = esl_event_get_header(event, "Caller-Destination-Number") ? esl_event_get_header(event, "Caller-Destination-Number") : "";
-	string strscraftID=esl_event_get_header(event, "Variable_speechCraftID") ? esl_event_get_header(event, "Variable_speechCraftID") : "";
-	string strtaskID=esl_event_get_header(event, "Variable_taskID") ? esl_event_get_header(event, "Variable_taskID") : "";
-	string strtaskname=esl_event_get_header(event, "Variable_taskname") ? esl_event_get_header(event, "Variable_taskname") : "";
-	string tmpNodeState = esl_event_get_header(event, "Variable_node_state") ? esl_event_get_header(event, "Variable_node_state") : "";
-	string strusername=esl_event_get_header(event, "Variable_username") ? esl_event_get_header(event, "Variable_username") : "";
-	//string strmainUUID=esl_event_get_header(event, "Variable_mainUUID") ? esl_event_get_header(event, "Variable_mainUUID") : "";
-	//printf("strscraftID:%s\n",strscraftID.c_str());
-// 	if(strUUID=="")
-// 		return;
-	//printf("strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
-	switch (event->event_id)
-	{
-	case ESL_EVENT_CUSTOM:
-		{
+{	
+	FScallManager* callmanager= FScallManager::Instance();
+	callmanager->CallEvent_handle(handle,event,keymap,knowledgelib);
+	
 
-			string event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
-			if (event_subclass == "asr")
-			{
-				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
-				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
-				const char *eventbody = esl_event_get_body(event);
-				esl_log(ESL_LOG_INFO, "eventbody=%s\n", eventbody);
-				string coreuuid = esl_event_get_header(event, "Core-UUID") ? esl_event_get_header(event, "Core-UUID") : "";
-				esl_log(ESL_LOG_INFO, "coreuuid=%s\n", coreuuid.c_str());
-				string Channel = esl_event_get_header(event, "Channel") ? esl_event_get_header(event, "Channel") : "";
-				string strmainUUID = esl_event_get_header(event, "mainUUID") ? esl_event_get_header(event, "mainUUID") : "";
-				esl_log(ESL_LOG_INFO, "Channel=%s\n", Channel.c_str());
-				FSsession*psession = GetSessionbymainUUID(strmainUUID);
-				esl_log(ESL_LOG_INFO, "strmainUUID=%s\n", strmainUUID.c_str());
-				esl_log(ESL_LOG_INFO,"find the session by channel\n");
-				if(psession!=NULL)
-				{
-					esl_log(ESL_LOG_INFO,"get the right sesson by id \n");
-					psession->handle=handle;
-					psession->event=event;
-					psession->Action();
-				}
-			}
 
-		}
-		break;
-	case ESL_EVENT_CHANNEL_ANSWER:  //创建会话
-		{
-			string is_callout, a_leg_uuid;
-			is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
-			//const char *eventbody=esl_event_get_body(event);
-			//printf("body:\n%s\n",eventbody);
-			string bridged_uuid = esl_event_get_header(event, "other-leg-unique-id") ? esl_event_get_header(event, "other-leg-unique-id") : "";
-			{
-				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER call in uuid:%s \n", strUUID.c_str());
-			}
-			FSsession*psession = CreateSession(handle,event,strtaskID,strscraftID,strUUID,caller_id,destination_number,strtaskname,strusername,m_userSetsilenseTime);
-			if(psession==NULL)
-			{
-				esl_log(ESL_LOG_INFO,"CreateSession failed\n");
-				return ;
-			}
-			m_SessionSet[strUUID]=psession;
-			char asrparam[256]={0};
-#ifdef _Use_ALI_SDK
-			sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
-#else
-			sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
-#endif
-			esl_log(ESL_LOG_INFO,"strUUID=%s,destination_number=%s,caller_id=%s,m_SessionSet.szie()=%d,event->event_id=%d\n",strUUID.c_str(),destination_number.c_str(),caller_id.c_str(),m_SessionSet.size(),event->event_id);
-			LOG(INFO)<<"create a session:"<<strUUID;
-			psession->handle=handle;
-			psession->event=event;
-			psession->Onanswar();
-			esl_status_t t = esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
-			esl_log(ESL_LOG_INFO, "start_asr:%d \n", t);
-		}
-		break;
-	case ESL_EVENT_CHANNEL_DESTROY:  //销毁会话
-		{
-			string is_callout = esl_event_get_header(event, "variable_is_callout") ? esl_event_get_header(event, "variable_is_callout") : ""; // ?????1???????????????
-			string hangupTime = esl_event_get_header(event, "Caller-Channel-Hangup-Time") ? esl_event_get_header(event, "Caller-Channel-Hangup-Time") : "";
-			string recordFileName = esl_event_get_header(event, "variable_record_filename") ? esl_event_get_header(event, "variable_record_filename") : "";
-			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
-			if(ite!=m_SessionSet.end())
-			{
-				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_DESTROY call in uuid:%s \n", strUUID.c_str());
-				FSsession*psession=ite->second;
-				m_SessionSet.erase(strUUID);
-				if(psession!=NULL)
-				{
-					m_sessionlock.lock();
-					esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
-					m_sessionlock.unlock();
-					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
-					psession->InsertSessionResult();
-					esl_log(ESL_LOG_INFO,"call stop_asr uuid:%s\n",(psession->strUUID).c_str());
-					delete psession;
-				}
-				LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
-			}
-			//LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
-			//esl_log(ESL_LOG_INFO, "after destory session, uuid:%s,m_SessionSet.size()=%d \n",  strUUID.c_str(),m_SessionSet.size());
-		}
-		break;
-	default:
-		{
-			map<string,FSsession*>::iterator ite=m_SessionSet.find(strUUID);
-			if(ite!=m_SessionSet.end())
-			{
-				FSsession*psession=m_SessionSet[strUUID];
-				if(psession!=NULL)
-				{
-					psession->handle=handle;
-					psession->event=event;
-					psession->Action();
-				}
-			}
-		}
-		break;
-	}
 }

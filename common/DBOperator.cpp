@@ -218,6 +218,50 @@ bool db_operator_t::GetnumberList(vector<t_Userinfo>&numberlist,string taskid)
 
 	return nSuccess;
 }
+bool db_operator_t::Getcallability(int&robotenum,int& recalltimes,string taskid)
+{
+	int nSuccess = 0;
+	Statement *state=NULL;
+	Connection *cmd;
+	ResultSet *result=NULL;
+	try
+	{
+		cmd = DBPool::GetInstance()->GetConnection();
+		if (cmd == NULL)
+		{
+			printf("Connection *cmd = dbIn==NULL....\n");
+		}
+
+		state = cmd->createStatement();
+		state->execute("use txacall");
+
+
+		char query[256] = {0};
+		sprintf(query, "select * from flow_create_tbl where task_id='%s'", taskid.c_str());
+		result = state->executeQuery(query);
+		string node;
+		//t_Userinfo userinfo;
+		while (result->next())
+		{
+			t_Userinfo userinfo;
+			robotenum=result->getInt("limits");
+			recalltimes=result->getInt("recall_times");
+			break;
+		}
+	}
+	catch (sql::SQLException &ex)
+	{
+		printf("SelectSql error:%s\n", ex.what());
+		nSuccess = -1;
+	}
+	if(result)
+		delete result;
+	if(state)
+		delete state;
+	DBPool::GetInstance()->ReleaseConnection(cmd);
+
+	return nSuccess;
+}
 bool db_operator_t::InsertSessionRe(string insertsql)
 {
 	xAutoLock L(_databaselock);

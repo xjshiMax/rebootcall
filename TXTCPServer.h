@@ -19,14 +19,9 @@ class TXTCPServer:public xTcpServerBase
 	{
 		cout<<date<<endl;
 		//收到批量请求
-		static FScallManager CallManager;
-		CallManager.CheckEndCall();
-		FScall* Onecall=new FScall;
-		Onecall->Initability();
-		if (!Onecall->Getablibity(date))
-			return 0;
-		Onecall->start();
-		CallManager.m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
+		FScallManager* CallManager=FScallManager::Instance();
+		//CallManager->CheckEndCall();
+		CallManager->HandleMessage(date);
 		return 0;
 	}
 	virtual int Onclose(int socketfd)
