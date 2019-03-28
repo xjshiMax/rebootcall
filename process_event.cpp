@@ -1333,7 +1333,7 @@ void FScallManager::CheckEndCall()
 			if(pcall->m_recallTimes<=0)
 			{
 				string taskid=CheckIte->first;
-				esl_log(ESL_LOG_INFO,"********delete call:CheckIte->id\n",taskid.c_str());
+				esl_log(ESL_LOG_INFO,"********delete call:CheckIte->id:%s\n",taskid.c_str());
 				m_TaskSet.erase(CheckIte++);
 				delete pcall;
 				pcall=NULL;
