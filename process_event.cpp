@@ -103,7 +103,10 @@ void FSsession::silenceAdd(int val)
 	if(val)
 		m_silenceTime=m_silenceTime+val;
 	else
+	{
 		m_silenceTime=0;	//置零
+		m_silencestatus=Session_nosilence;
+	}
 }
 bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
 {
@@ -379,7 +382,7 @@ void FSsession::Onsilence()
 }
 void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 {
-	xAutoLock l(m_databaselock);
+	xAutoLock L(m_silencestatusLock);
 	string event_subclass, contact, from_user;
 	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	vector<base_knowledge_t> knowledgeset=FSprocess::m_knowledgeSet;
@@ -391,50 +394,37 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 
 	case ESL_EVENT_CUSTOM:
 	{
-// 		event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
-// 		contact = esl_event_get_header(event, "contact") ? esl_event_get_header(event, "contact") : "";
-// 		from_user = esl_event_get_header(event, "from-user") ? esl_event_get_header(event, "from-user") : "";
-// 
-// 		if (event_subclass == "sofia::register")
-// 		{
-// 
-// 			esl_log(ESL_LOG_INFO, "sofia::register  %s, %d event_subclass=%s, contact=%s, from-user=%s\n", __FILE__, __LINE__, event_subclass.c_str(), contact.c_str(), from_user.c_str());
-// 		}
-// 		else if (event_subclass == "sofia::unregister")
-// 		{
-// 		}
-// 		else if (event_subclass == "asr")
-// 		{
-			string asrResp = esl_event_get_header(pevent, "ASR-Response") ? esl_event_get_header(pevent, "ASR-Response") : "";
-			esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);
-			LOG(INFO)<<"asrResp="<<asrResp;
-			LOG(INFO)<<"strUUID="<<strUUID;
-			LOG(INFO)<<"m_IsAsr="<<m_IsAsr;
-			string asrParstText;
-#ifdef _Use_ALI_SDK
-// 			int pos = asrResp.find("text");
-// 			if (pos<0) {
-// 
-// 				return ;
-// 			}
-// 			asrParstText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
-			asrParstText=asrResp;
-#else 
-			cJSON *textRoot= cJSON_Parse(asrResp.c_str());
-			cJSON*results_recognition=cJSON_GetObjectItem(textRoot,"results_recognition");
-			if(!results_recognition)
-				return ;
-			int arr1=cJSON_GetArraySize(results_recognition);
-			cJSON*word=cJSON_GetArrayItem(results_recognition,0);
-			asrParstText=word->valuestring;
-#endif		
-			if(asrParstText=="")
-				return;
-
-			esl_log(ESL_LOG_INFO,"we find text in aspResp\n");
+			
 			if(m_IsAsr)
 			{
 				m_IsAsr=false;
+				string asrResp = esl_event_get_header(pevent, "ASR-Response") ? esl_event_get_header(pevent, "ASR-Response") : "";
+				esl_log(ESL_LOG_INFO, "asrResp=%s,strUUID=%s,m_IsAsr=%d\n", asrResp.c_str(),strUUID.c_str(),m_IsAsr);
+				LOG(INFO)<<"asrResp="<<asrResp;
+				LOG(INFO)<<"strUUID="<<strUUID;
+				LOG(INFO)<<"m_IsAsr="<<m_IsAsr;
+				string asrParstText;
+#ifdef _Use_ALI_SDK
+				// 			int pos = asrResp.find("text");
+				// 			if (pos<0) {
+				// 
+				// 				return ;
+				// 			}
+				// 			asrParstText = codeHelper::GetInstance()->getAliAsrTxt(asrResp);
+				asrParstText=asrResp;
+#else 
+				cJSON *textRoot= cJSON_Parse(asrResp.c_str());
+				cJSON*results_recognition=cJSON_GetObjectItem(textRoot,"results_recognition");
+				if(!results_recognition)
+					return ;
+				int arr1=cJSON_GetArraySize(results_recognition);
+				cJSON*word=cJSON_GetArrayItem(results_recognition,0);
+				asrParstText=word->valuestring;
+#endif		
+				if(asrParstText=="")
+					return;
+
+				esl_log(ESL_LOG_INFO,"we find text in aspResp\n");
 // 				m_silencestatusLock.lock();
 // 				m_silencestatus=Session_nosilence;
 // 				silenceAdd(Session_resetsilence);
@@ -521,10 +511,8 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 					m_SessionState|=GF_knowledge_node;
 				}
 				SetFinnallabel(nodeState,nextstate);
-				m_silencestatusLock.lock();
-				m_silencestatus=Session_nosilence;
+				//m_silencestatus=Session_nosilence;
 				silenceAdd(Session_resetsilence);
-				m_silencestatusLock.unlock();
 				switch(nextstate)
 				{
 				case SC_Opening_Remarks:
@@ -1163,7 +1151,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 		{
 			xAutoLock l(m_sessionlock);
 			string event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
-			if (event_subclass == "asr")
+			if (event_subclass == "asr"||event_subclass == "asrchanged")
 			{
 				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
@@ -1180,6 +1168,12 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				if(psession!=NULL)
 				{
 					esl_log(ESL_LOG_INFO,"get the right sesson by id \n");
+					if (event_subclass == "asrchanged")
+					{
+						esl_log(ESL_LOG_INFO, "asrchanged \n");
+						psession->silenceAdd(Session_resetsilence);
+						break;
+					}
 					psession->handle=handle;
 					psession->event=event;
 					psession->Action(handle,event);
@@ -1221,9 +1215,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				psession->Onanswar();
 				esl_status_t t = esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
 				esl_log(ESL_LOG_INFO, "start_asr:%d \n", t);
-				psession->m_silencestatusLock.lock();
-				psession->m_silencestatus=Session_nosilence;
-				psession->m_silencestatusLock.unlock();
+				psession->silenceAdd(Session_resetsilence);
 			}
 
 		}
