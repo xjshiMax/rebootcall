@@ -43,7 +43,7 @@ bool db_operator_t::SelectSql(map<uint32_t,base_script_t>& vSpeech,int32_t voice
         }
 
         state = cmd->createStatement();
-        state->execute("use txacall");
+        state->execute("use txcall");
 
 
         char query[256] = {0};
@@ -91,7 +91,7 @@ bool db_operator_t::SelectSqlAllSC(map<string,base_script_t>& vSpeech)
 		}
 
 		state = cmd->createStatement();
-		state->execute("use txacall");
+		state->execute("use txcall");
 
 
 		char query[256] = {0};
@@ -140,7 +140,7 @@ bool db_operator_t::GetKnowledge(vector<base_knowledge_t>&knowledgelib)
 		}
 
 		state = cmd->createStatement();
-		state->execute("use txacall");
+		state->execute("use txcall");
 
 
 		char query[256] = {0};
@@ -188,7 +188,7 @@ bool db_operator_t::GetnumberList(vector<t_Userinfo>&numberlist,string taskid)
 		}
 
 		state = cmd->createStatement();
-		state->execute("use txacall");
+		state->execute("use txcall");
 
 
 		char query[256] = {0};
@@ -218,7 +218,7 @@ bool db_operator_t::GetnumberList(vector<t_Userinfo>&numberlist,string taskid)
 
 	return nSuccess;
 }
-bool db_operator_t::Getcallability(int&robotenum,int& recalltimes,string taskid)
+bool db_operator_t::Getcallability(t_Task_Info& taskinfo,string taskid)
 {
 	int nSuccess = 0;
 	Statement *state=NULL;
@@ -233,7 +233,7 @@ bool db_operator_t::Getcallability(int&robotenum,int& recalltimes,string taskid)
 		}
 
 		state = cmd->createStatement();
-		state->execute("use txacall");
+		state->execute("use txcall");
 
 
 		char query[256] = {0};
@@ -244,8 +244,9 @@ bool db_operator_t::Getcallability(int&robotenum,int& recalltimes,string taskid)
 		while (result->next())
 		{
 			t_Userinfo userinfo;
-			robotenum=result->getInt("limits");
-			recalltimes=result->getInt("recall_times");
+			taskinfo.robotenum=result->getInt("limits");
+			taskinfo.recalltimes=result->getInt("recall_times");
+			taskinfo.originate_timeout=result->getInt("originate_timeout");
 			break;
 		}
 	}
@@ -279,7 +280,7 @@ bool db_operator_t::InsertSessionRe(string insertsql)
 		}
 
 		state = cmd->createStatement();
-		state->execute("use txacall");
+		state->execute("use txcall");
 		p_query=new char[insertsql.length()+1];
 		memset(p_query,0,insertsql.length()+1);
 

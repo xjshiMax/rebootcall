@@ -172,9 +172,9 @@ public:
 	bool m_stop;
 	int m_CallStatus;
 	vector<t_Userinfo>::iterator m_pPauseIte;
-	int m_robotNum;
-	int m_recallTimes;
-
+// 	int m_robotNum;
+// 	int m_recallTimes;
+	 t_Task_Info m_taskinfo;
 	map<string,FSsession*> m_SessionSet;
 	std::vector<t_Userinfo> m_notAnswerSet;
 	xMutex m_sessionlock;

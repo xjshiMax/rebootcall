@@ -37,4 +37,11 @@ typedef struct{
 	string username;
 	string phonenum;
 }t_Userinfo;
+
+typedef struct 
+{
+	int robotenum;
+	int recalltimes;
+	int originate_timeout;
+}t_Task_Info;
 #endif
