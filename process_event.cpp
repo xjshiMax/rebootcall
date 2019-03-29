@@ -119,25 +119,19 @@ bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
 }
 int FSsession::Getnextstatus(string asrtext,string keyword)
 {
-	if(m_silencestatus==Session_silencefirst)	//如果前面检测到静音，下一句无条件重复上一个节点
+	if(m_silencestatus==Session_silencefirst||((m_SessionState&GF_knowledge_node)&&(!(m_SessionState&GF_nothear))))	//如果前面检测到静音，下一句无条件重复上一个节点
 	{
+		m_SessionState=GF_normal_node;
 		int listsize=m_nodelist.size();
 		if(listsize>=1)
 			return m_nodelist[listsize-1];
 	}
-	if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
+	else if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
 	{
 		m_SessionState=GF_normal_node;
 		int listsize=m_nodelist.size();
 		if(listsize>=2)
 			return m_nodelist[listsize-2];
-	}
-	else if((m_SessionState&GF_knowledge_node)&&(!(m_SessionState&GF_nothear)))
-	{
-		m_SessionState=GF_normal_node;
-		int listsize=m_nodelist.size();
-		if(listsize>=1)
-			return m_nodelist[listsize-1];
 	}
 	cJSON *root = cJSON_Parse(keyword.c_str());
 	if(!root) //如果解析失败，直接返回到 SC_Contect_nextTime
@@ -278,6 +272,7 @@ void FSsession::Onanswar()
 // 	m_silencestatusLock.lock();
 // 	m_silencestatus=Session_nosilence;
 // 	m_silencestatusLock.unlock();
+	m_DB_creatd_at = GetUTCtimestamp();
 	char tmp_cmd[1024] = {0};
 	string recordpath=Getrecordpath();
 	char filename[64];
@@ -304,7 +299,7 @@ void FSsession::Onanswar()
 	if (iter != nodeMap.end())
 	{
 		base_script_t node = iter->second;
-		node.vox_base += ".wav";
+		//node.vox_base += ".wav";
 		esl_execute(handle, "set", "node_state=1", strUUID.c_str());
 		//playDetectSpeech(node.vox_base.c_str(), handle, strUUID.c_str());
 		esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
@@ -329,7 +324,7 @@ void FSsession::Onsilence()
 			if (iter != nodeMap.end())
 			{
 				base_script_t node = iter->second;
-				node.vox_base += ".wav";
+				//node.vox_base += ".wav";
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
 				collection("机器人",node.desc,-1);
@@ -356,7 +351,7 @@ void FSsession::Onsilence()
 			if (iter != nodeMap.end())
 			{
 				base_script_t node = iter->second;
-				node.vox_base += ".wav";
+				//node.vox_base += ".wav";
 				printf("100 stop_asr uuid:%s",strUUID.c_str());
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
@@ -600,7 +595,7 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 				if (iter != nodeMap.end())
 				{
 					base_script_t node = iter->second;
-					node.vox_base += ".wav";
+					//node.vox_base += ".wav";
 					printf("100 stop_asr uuid:%s",strUUID.c_str());
 					esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
@@ -704,7 +699,8 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 			LOG(INFO)<<"ESL_EVENT_CHANNEL_HANGUP:CALL IN  :"<<strUUID<<" hangup cause:"<<hangup_cause;
 		}
 		this->m_DB_end_stamp=Getcurrenttime();
-		this->m_DB_duration=GetUTCtimestamp()-this->m_DB_creatd_at;
+		if(this->m_silencestatus!=Session_noanswar)
+			this->m_DB_duration=GetUTCtimestamp()-this->m_DB_creatd_at;
 		break;
 	}
 	case ESL_EVENT_CHANNEL_HANGUP_COMPLETE:
@@ -888,13 +884,13 @@ int FScall::GetnumbrList()
 {
 	  //db_operator_t::initDatabase();
 	 db_operator_t::GetnumberList(m_NumberSet,m_taskID);
-	 db_operator_t::Getcallability(m_robotNum,m_recallTimes,m_taskID);
+	 db_operator_t::Getcallability(m_taskinfo,m_taskID);
 // 	 if (m_robotNum<=0||m_robotNum>=MaxRobotNum)
 // 	 {
 // 		esl_log(ESL_LOG_INFO,"the invalid rebot num\n");
 // 		 m_robotNum=MaxRobotNum;
 // 	 }
-	 esl_log(ESL_LOG_INFO,"FScall::GetnumbrList,m_robotNum=%d,m_recallTimes=%d\n",m_robotNum,m_recallTimes);
+	 esl_log(ESL_LOG_INFO,"FScall::GetnumbrList,m_robotNum=%d,m_recallTimes=%d\n",m_taskinfo.robotenum,m_taskinfo.recalltimes);
 	  return 0;
 }
 void FScall::Initability()
@@ -977,7 +973,7 @@ void FScall::StopTask()
 	m_stop=true;
 	m_IsAllend=true;
 	m_CallStatus=CallStop;
-	m_recallTimes=0;
+	m_taskinfo.recalltimes=0;
 	xAutoLock l(m_sessionlock);
 	m_Sessioncond.signal();
 }
@@ -1030,20 +1026,20 @@ int FScall::LauchFScall()
 		ite=m_pPauseIte;
 	m_CallStatus=CallStart;
 	esl_log(ESL_LOG_INFO,"munberset.size=%d\n",m_NumberSet.size());
-	int NumCancall=m_robotNum;
+	int NumCancall=m_taskinfo.robotenum;
 	while(ite!=m_NumberSet.end()&&!m_stop)
 	{
 		//xAutoLock L(m_sessionlock);
 		if(NumCancall<=0)
 		{
 			xAutoLock L(m_sessionlock);
-			esl_log(ESL_LOG_INFO,"FSprocess::m_Sessioncond.wait,m_robotNum=%d\n",m_robotNum);
+			esl_log(ESL_LOG_INFO,"FSprocess::m_Sessioncond.wait,m_robotNum=%d\n",m_taskinfo.robotenum);
 			esl_log(ESL_LOG_INFO,"NumCancall:%d\n",NumCancall);
 			m_Sessioncond.wait(m_sessionlock);
-			NumCancall=m_robotNum-m_SessionSet.size();
+			NumCancall=m_taskinfo.robotenum-m_SessionSet.size();
 		}
 		//originate_time
-		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=%d,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_originate_timeout,m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=%d,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_taskinfo.originate_timeout,m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s,FSprocess::m_SessionSet.size()=%d\n",callCmd,m_SessionSet.size()); 
@@ -1089,10 +1085,10 @@ void FScall::Checksilence()
 }
 int FScall::reLauchFSCall()
 {
-	if(m_CallStatus==Recall&&FinishCreateAllSession()&&m_recallTimes>0)
+	if(m_CallStatus==Recall&&FinishCreateAllSession()&&m_taskinfo.recalltimes>0)
 	{
 		esl_log(ESL_LOG_INFO,"-----************-----reLauchFSCall m_CallStatus=%d,m_notAnswerSet=%d\n",m_CallStatus,m_notAnswerSet.size());
-		m_recallTimes--;
+		m_taskinfo.recalltimes--;
 		m_pPauseIte=m_NumberSet.end();
 		m_IsAllend=false;
 		maxSessionDestory=0;
@@ -1140,7 +1136,7 @@ FSsession* FScall::CreateSession(esl_handle_t *handle,esl_event_t *event,string 
 	psession->handle=handle;
 	psession->event=event;
 	psession->m_DB_task_name=taskname;
-	psession->m_DB_creatd_at = psession->GetUTCtimestamp();
+	//psession->m_DB_creatd_at = psession->GetUTCtimestamp();
 	psession->m_DB_start_stamp=psession->Getcurrenttime();
 	psession->m_DB_updated_at=0;
 	psession->m_username=username;
@@ -1265,7 +1261,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				}
 				LOG(INFO)<<"after destory session, uuid:"<<strUUID<<" m_SessionSet.size:"<<m_SessionSet.size();
 			}
-			if(m_SessionSet.size()<m_robotNum)
+			if(m_SessionSet.size()<m_taskinfo.robotenum)
 			{
 				m_Sessioncond.signal();
 				esl_log(ESL_LOG_INFO, "ESL_EVENT_CHANNEL_ANSWER signal \n");
@@ -1330,7 +1326,7 @@ void FScallManager::CheckEndCall()
 		}
 		if(pcall->m_IsAllend&& pcall->m_SessionSet.empty()&&pcall->FinishCreateAllSession())
 		{
-			if(pcall->m_recallTimes<=0)
+			if(pcall->m_taskinfo.recalltimes<=0)
 			{
 				string taskid=CheckIte->first;
 				esl_log(ESL_LOG_INFO,"********delete call:CheckIte->id:%s\n",taskid.c_str());
@@ -1391,7 +1387,7 @@ string FScallManager::HandleMessage(string data)
 			return ERRORJSON;
 		//Onecall->maxSessionCreate=0;
 		Onecall->GetnumbrList();
-		if(Onecall->m_robotNum<=0||Onecall->m_robotNum>MaxRobotNum)
+		if(Onecall->m_taskinfo.robotenum<=0||Onecall->m_taskinfo.robotenum>MaxRobotNum)
 			return ERRORROBOT;
 		Onecall->start();
 		m_TaskSet.insert(pair<string,FScall*>(Onecall->m_taskID,Onecall));
