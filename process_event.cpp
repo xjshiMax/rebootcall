@@ -105,7 +105,6 @@ void FSsession::silenceAdd(int val)
 	else
 	{
 		m_silenceTime=0;	//置零
-		m_silencestatus=Session_nosilence;
 	}
 }
 bool FSsession::CheckoutIfsilence() //	检测是否是静音，是则返回真
@@ -316,7 +315,7 @@ void FSsession::Onsilence()
 	{
 	case Session_nosilence:
 		{
-			xAutoLock L(m_silencestatusLock);
+			//xAutoLock L(m_silencestatusLock);
 			m_silencestatus=Session_silencefirst;
 		//	m_silenceTime=0;
 			m_IsAsr=false;
@@ -329,7 +328,10 @@ void FSsession::Onsilence()
 				base_script_t node = iter->second;
 				//node.vox_base += ".wav";
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
-				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				if(FSprocess::m_timeouthandle!=NULL)
+					esl_status_t t=esl_execute(FSprocess::m_timeouthandle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				else
+					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
 				collection("机器人",node.desc,-1);
 				//	m_DB_talk_times+=1;
 				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:0 \n");
@@ -344,7 +346,7 @@ void FSsession::Onsilence()
 		break;
 	case Session_silencefirst:
 		{
-			xAutoLock L(m_silencestatusLock);
+		//	xAutoLock L(m_silencestatusLock);
 			m_silencestatus=Session_silenceSecond;
 			m_IsAsr=false;
 			map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
@@ -357,7 +359,10 @@ void FSsession::Onsilence()
 				//node.vox_base += ".wav";
 				printf("100 stop_asr uuid:%s",strUUID.c_str());
 				esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
-				esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				if(FSprocess::m_timeouthandle!=NULL)
+					esl_status_t t=esl_execute(FSprocess::m_timeouthandle, "playback", node.vox_base.c_str(), strUUID.c_str());
+				else
+					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), strUUID.c_str());
 				collection("机器人",node.desc,-1);
 				//	m_DB_talk_times+=1;
 				esl_log(ESL_LOG_INFO, "playback the answar ,nodeState 0 \n");
@@ -382,7 +387,7 @@ void FSsession::Onsilence()
 }
 void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 {
-	xAutoLock L(m_silencestatusLock);
+	//xAutoLock L(m_silencestatusLock);
 	string event_subclass, contact, from_user;
 	map<string, base_script_t> nodeMap = FSprocess::m_gKeymap;
 	vector<base_knowledge_t> knowledgeset=FSprocess::m_knowledgeSet;
@@ -511,7 +516,7 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 					m_SessionState|=GF_knowledge_node;
 				}
 				SetFinnallabel(nodeState,nextstate);
-				//m_silencestatus=Session_nosilence;
+				m_silencestatus=Session_nosilence;
 				silenceAdd(Session_resetsilence);
 				switch(nextstate)
 				{
@@ -1060,9 +1065,11 @@ void FScall::Checksilence()
 		FSsession*p=ite->second;
 		if(p)
 		{
+			esl_log(ESL_LOG_INFO,"-----silenceAdd\n");
 			p->silenceAdd(Session_silenceinc);
 			if(p->CheckoutIfsilence())
 			{
+				esl_log(ESL_LOG_INFO,"-----CheckoutIfsilence\n");
 				p->silenceAdd(Session_resetsilence);
 				p->Onsilence();
 			}
@@ -1151,8 +1158,10 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 		{
 			xAutoLock l(m_sessionlock);
 			string event_subclass = esl_event_get_header(event, "Event-Subclass") ? esl_event_get_header(event, "Event-Subclass") : "";
-			if (event_subclass == "asr"||event_subclass == "asrchanged")
+			esl_log(ESL_LOG_INFO,"event_subclass=%s\n",event_subclass.c_str());
+			if (event_subclass == "asr")
 			{
+				string Wordstatue = esl_event_get_header(event, "Wordstatue") ? esl_event_get_header(event, "Wordstatue") : "";
 				string asrResp = esl_event_get_header(event, "ASR-Response") ? esl_event_get_header(event, "ASR-Response") : "";
 				esl_log(ESL_LOG_INFO, "asrResp=%s\n", asrResp.c_str());
 // 				const char *eventbody = esl_event_get_body(event);
@@ -1168,7 +1177,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				if(psession!=NULL)
 				{
 					esl_log(ESL_LOG_INFO,"get the right sesson by id \n");
-					if (event_subclass == "asrchanged")
+					if (Wordstatue == "0")
 					{
 						esl_log(ESL_LOG_INFO, "asrchanged \n");
 						psession->silenceAdd(Session_resetsilence);
@@ -1216,7 +1225,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				esl_status_t t = esl_execute(handle, "start_asr", (const char*)asrparam, (psession->strUUID).c_str());
 				esl_log(ESL_LOG_INFO, "start_asr:%d \n", t);
 				psession->silenceAdd(Session_resetsilence);
-			}
+				psession->m_silencestatus=Session_nosilence;			}
 
 		}
 		break;
@@ -1518,6 +1527,7 @@ vector<base_knowledge_t>FSprocess::m_knowledgeSet;
 string FSprocess::m_recordPath="/home/path";
 int FSprocess::m_userSetsilenseTime;
 int FSprocess::m_robotNum=10;
+esl_handle_t *FSprocess::m_timeouthandle=NULL;
 void FSprocess::Initability()
 {
 	IniFile IniService;
@@ -1578,6 +1588,8 @@ void *FSprocess::Inbound_Init(void *arg)
 {
 
     esl_handle_t handle = {{0}};
+	m_timeouthandle=new esl_handle_t;
+	memset(m_timeouthandle,0,sizeof(m_timeouthandle));
     esl_status_t status;
     const char *uuid;
 
@@ -1591,13 +1603,20 @@ void *FSprocess::Inbound_Init(void *arg)
         esl_log(ESL_LOG_INFO, "Connect Error: %d\n", status);
         exit(1);
     }
+	 status =esl_connect(m_timeouthandle, m_fsip.c_str(), m_fsPort, NULL, m_fsPassword.c_str());
+
+	 if (status != ESL_SUCCESS)
+	 {
+		 esl_log(ESL_LOG_INFO, "time out handle Connect Error: %d\n", status);
+		 exit(1);
+	 }
 //	m_sessionHandle=&handle;
 	//esl_execute(FSprocess::getSessionhandle(), "start_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0","");
     esl_log(ESL_LOG_INFO, "Connected to FreeSWITCH\n");
   //  esl_events(&handle, ESL_EVENT_TYPE_PLAIN,
     //           "DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_BRIDGE CHANNEL_ANSWER CUSTOM sofia::register sofia::unregister asr");
 	esl_events(&handle, ESL_EVENT_TYPE_PLAIN,
-		"DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING  CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP CHANNEL_BRIDGE CHANNEL_ANSWER  CUSTOM sofia::register sofia::unregister asr ");
+		"DETECTED_SPEECH RECORD_START RECORD_STOP PLAYBACK_START PLAYBACK_STOP CHANNEL_OUTGOING  CHANNEL_PARK CHANNEL_EXECUTE_COMPLETE CHANNEL_ORIGINATE TALK NOTALK PHONE_FEATURE CHANNEL_HANGUP_COMPLETE CHANNEL_CREATE CHANNEL_BRIDGE DTMF CHANNEL_DESTROY CHANNEL_HANGUP  CHANNEL_BRIDGE CHANNEL_ANSWER  CUSTOM sofia::register sofia::unregister asr");
 
 	esl_log(ESL_LOG_INFO, "%s\n", handle.last_sr_reply);
 

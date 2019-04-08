@@ -240,5 +240,6 @@ public:
 	//slienceCheck m_slienceCheck;
 	static int m_userSetsilenseTime;
 	static int m_robotNum;
+	static esl_handle_t *m_timeouthandle;
 };
 
