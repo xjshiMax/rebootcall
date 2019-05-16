@@ -50,29 +50,43 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 {
 	if(m_bhaveset)
 		return;
-	if(nextstatus==18)//您是我们特别邀请的尊贵用户，享有快速服务通道
+// 	if(nextstatus==18)//您是我们特别邀请的尊贵用户，享有快速服务通道
+// 		m_DB_outbound_label="A";
+// 	else if((currentstatus==1&&nextstatus==5)||(currentstatus==2&&nextstatus==5))
+// 		m_DB_outbound_label="B";
+// 	else if((currentstatus==16&&nextstatus==15)||nextstatus==17)
+// 		m_DB_outbound_label="C";
+// 	else if((currentstatus==3&&nextstatus==10)||(currentstatus==14&&nextstatus==10)||(currentstatus==24&&nextstatus==10))
+// 	{
+// 		m_DB_outbound_label="D";
+// 	}
+// 	else if((currentstatus==8&&nextstatus==12)||(currentstatus==24&&nextstatus==12))
+// 	{
+// 		m_DB_outbound_label="E";
+// 	}
+// 	else if(nextstatus==6)
+// 	{
+// 		m_DB_outbound_label="F";
+// 	}
+// 	else if(nextstatus==13)  
+// 	{
+// 		m_DB_outbound_label="A1";
+// 	}
+	bool Isneedchange=(m_DB_outbound_label=="");
+	if(nextstatus==8||nextstatus==22)
 		m_DB_outbound_label="A";
-	else if((currentstatus==1&&nextstatus==5)||(currentstatus==2&&nextstatus==5))
+	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"A")>0)&&nextstatus==13)
 		m_DB_outbound_label="B";
-	else if((currentstatus==16&&nextstatus==15)||nextstatus==17)
+	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"B")>0)&&nextstatus==11)
 		m_DB_outbound_label="C";
-	else if((currentstatus==3&&nextstatus==10)||(currentstatus==14&&nextstatus==10)||(currentstatus==24&&nextstatus==10))
-	{
+	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"C")>0)&&((currentstatus==14&&nextstatus==13) ||(currentstatus==3&&nextstatus==18)||(currentstatus==5&&nextstatus==11)||(currentstatus==25&&nextstatus==11)))
 		m_DB_outbound_label="D";
-	}
-	else if((currentstatus==8&&nextstatus==12)||(currentstatus==24&&nextstatus==12))
-	{
-		m_DB_outbound_label="E";
-	}
-	else if(nextstatus==6)
-	{
+	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"D")>0)&&((currentstatus==16&&nextstatus==17) ||(currentstatus==19&&nextstatus==17)||(currentstatus==21&&nextstatus==17)||(currentstatus==23&&nextstatus==17)||(currentstatus==29&&nextstatus==11)
+		||(currentstatus==26&&nextstatus==17) ||(currentstatus==27&&nextstatus==17)))
+	m_DB_outbound_label="E";
+	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"E")>0)&&nextstatus==12)
 		m_DB_outbound_label="F";
-	}
-	else if(nextstatus==13)  
-	{
-		m_DB_outbound_label="A1";
-	}
-
+		
 }
 void FSsession::collection(string name,string Text,int node)
 {
@@ -128,7 +142,7 @@ int FSsession::Getnextstatus(string asrtext,string keyword)
 		if(listsize>=1)
 			return m_nodelist[listsize-1];
 	}
-	else if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear))
+	else if((m_SessionState&GF_knowledge_node)&&(m_SessionState&GF_nothear)) //播报知识库以后，如果出现没听清节点，重复知识库前面的节点。
 	{
 		m_SessionState=GF_normal_node;
 		int listsize=m_nodelist.size();
@@ -593,7 +607,8 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 					esl_log(ESL_LOG_INFO, " uuid=%s\n",strUUID.c_str());
 					esl_status_t t=esl_execute(handle, "playback", node.vox_base.c_str(), a_uuid.c_str());
 					collection("机器人",node.desc,nodeState);
-					if(nodeState==8||nodeState==21||nodeState==22||nodeState==23||nodeState==24||nodeState==25||nodeState==26||nodeState==27)
+					if(nodeState==16||nodeState==19||nodeState==20||nodeState==21||nodeState==23||
+						nodeState==29||nodeState==30||nodeState==24||nodeState==28||nodeState==26||nodeState==27)
 						m_SessionState|=GF_nothear;
 					m_DB_talk_times+=1;
 					esl_log(ESL_LOG_INFO, "playback the answar ,nodeState:%d \n",nodeState);
@@ -692,8 +707,8 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 			LOG(INFO)<<"ESL_EVENT_CHANNEL_HANGUP:CALL IN  :"<<strUUID<<" hangup cause:"<<hangup_cause;
 		}
 		this->m_DB_end_stamp=Getcurrenttime();
-		if(this->m_silencestatus!=Session_noanswar)
-			this->m_DB_duration=GetUTCtimestamp()-this->m_DB_creatd_at;
+// 		if(this->m_silencestatus!=Session_noanswar)
+// 			this->m_DB_duration=GetUTCtimestamp()-this->m_DB_creatd_at;
 		break;
 	}
 	case ESL_EVENT_CHANNEL_HANGUP_COMPLETE:
@@ -706,6 +721,9 @@ void FSsession::Action(esl_handle_t *phandle,esl_event_t *pevent)
 			esl_log(ESL_LOG_INFO, "CALL OUT HANGUP_COMPLETE :%s\n", strUUID.c_str());
 			//record
 		}
+		string billsec = esl_event_get_header(event, "variable_duration") ? esl_event_get_header(event, "variable_duration") : "";
+		if(this->m_silencestatus!=Session_noanswar)
+			this->m_DB_duration=atoi(billsec.c_str());
 		break;
 	}
 
@@ -1039,7 +1057,7 @@ int FScall::LauchFScall()
 		--NumCancall;
 		maxCallout++;
 		esl_log(ESL_LOG_INFO,"NumCancall:%d\n",NumCancall);
-		ite++;
+		//ite++;
 		m_pPauseIte=ite;
 	}
     if (handle.last_sr_event && handle.last_sr_event->body)
