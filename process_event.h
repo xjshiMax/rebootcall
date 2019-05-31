@@ -24,6 +24,7 @@
 #include "base/include/xthreadPool.h"
 #include "base/inifile/inifile.h"
 #include "base/include/xOntimerBase.h"
+/*#include "base/include/xAtomicInt32.h"*/
 using namespace std;
 using namespace inifile;
 using namespace SAEBASE;
@@ -60,7 +61,7 @@ class FSprocess;
 class FSsession:public xtaskbase
 {
 	public:
-		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_duration(0),m_DB_outbound_label(""),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
+		FSsession():nodeState(1),m_channelpath(""),m_IsAsr(false),m_DB_talk_times(0),m_DB_duration(0),m_DB_outbound_label("D"),m_bhaveset(false),m_SessionWord(""),m_username(""),m_SessionState(GF_normal_node),
 			m_silenceTime(0),m_silencestatus(Session_noanswar),m_playbackstatus(Session_noplayback),m_DB_hungup("customer hung up"){}
 		virtual int run();
 		void Action(esl_handle_t *phandle,esl_event_t *pevent);
@@ -180,6 +181,25 @@ public:
 	xMutex m_sessionlock;
 	xCondition m_Sessioncond;
 };
+
+struct t_aliConfigxml
+{
+	string appkey;
+	string User;
+	string AccessKeyId;
+	string AccessKeySecret;
+	int index;
+	int MaxIndex;
+	//vector<string> UUIDSet;
+	t_aliConfigxml():MaxIndex(10),index(0)
+	{
+		appkey="";
+		User="";
+		AccessKeyId="";
+		AccessKeySecret="";
+	}
+};
+
 //管理通话任务类
 class FScallManager:public OnTimerBase
 {
@@ -203,6 +223,7 @@ public:
 	static Mutex m_InstLock;
 	Mutex m_CallLock;
 	int m_count;
+	//static map<string,t_aliConfigxml> m_aliconfigmap;
 };
 
 
@@ -220,6 +241,9 @@ public:
 		cout<<"~FSprocess is called"<<endl;
 	}
 	void Initability();
+	void LoadaliSDKonfig(string strpath);
+	static t_aliConfigxml& Getavaliable(string uuid);
+	static void SetfreeRES(string uuid);
 	virtual void run();
 	void startProcess();
 //	static FSsession* CreateSession(esl_handle_t *handle,esl_event_t *event,string strtaskID,string strscraftID,string strUUID,string caller_id,string destination_number,string taskname,string username,int silenceTime);
@@ -241,5 +265,8 @@ public:
 	static int m_userSetsilenseTime;
 	static int m_robotNum;
 	static esl_handle_t *m_timeouthandle;
+	static map<string,t_aliConfigxml> m_aliconfigmap;
+	static map<string,string> m_uuid_aliconfig; // uuid---appkey
+	static string m_prefixnum;
 };
 

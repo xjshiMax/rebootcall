@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include "base/glog/linux/glog/logging.h"
+#include "base/pugixml/include/pugixml.hpp"
 using namespace std;
+using namespace pugi;
 #define _Use_ALI_SDK
 #define MaxRobotNum 10
 #define ERRORCMD	"do not support this cmd.only support start,pause,resume,stop"
@@ -50,42 +52,21 @@ void FSsession::SetFinnallabel(int currentstatus,int nextstatus)
 {
 	if(m_bhaveset)
 		return;
-// 	if(nextstatus==18)//您是我们特别邀请的尊贵用户，享有快速服务通道
-// 		m_DB_outbound_label="A";
-// 	else if((currentstatus==1&&nextstatus==5)||(currentstatus==2&&nextstatus==5))
-// 		m_DB_outbound_label="B";
-// 	else if((currentstatus==16&&nextstatus==15)||nextstatus==17)
-// 		m_DB_outbound_label="C";
-// 	else if((currentstatus==3&&nextstatus==10)||(currentstatus==14&&nextstatus==10)||(currentstatus==24&&nextstatus==10))
-// 	{
-// 		m_DB_outbound_label="D";
-// 	}
-// 	else if((currentstatus==8&&nextstatus==12)||(currentstatus==24&&nextstatus==12))
-// 	{
-// 		m_DB_outbound_label="E";
-// 	}
-// 	else if(nextstatus==6)
-// 	{
-// 		m_DB_outbound_label="F";
-// 	}
-// 	else if(nextstatus==13)  
-// 	{
-// 		m_DB_outbound_label="A1";
-// 	}
-	bool Isneedchange=(m_DB_outbound_label=="");
-	if(nextstatus==8||nextstatus==22)
-		m_DB_outbound_label="A";
-	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"A")>0)&&nextstatus==13)
-		m_DB_outbound_label="B";
-	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"B")>0)&&nextstatus==11)
-		m_DB_outbound_label="C";
-	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"C")>0)&&((currentstatus==14&&nextstatus==13) ||(currentstatus==3&&nextstatus==18)||(currentstatus==5&&nextstatus==11)||(currentstatus==25&&nextstatus==11)))
-		m_DB_outbound_label="D";
-	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"D")>0)&&((currentstatus==16&&nextstatus==17) ||(currentstatus==19&&nextstatus==17)||(currentstatus==21&&nextstatus==17)||(currentstatus==23&&nextstatus==17)||(currentstatus==29&&nextstatus==11)
-		||(currentstatus==26&&nextstatus==17) ||(currentstatus==27&&nextstatus==17)))
-	m_DB_outbound_label="E";
-	else if((Isneedchange||strcmp(m_DB_outbound_label.c_str(),"E")>0)&&nextstatus==12)
-		m_DB_outbound_label="F";
+
+
+ 	if(nextstatus==6||(currentstatus==7&&nextstatus==2))
+ 	{
+ 		m_DB_outbound_label="A";
+ 	}
+ 	else if(nextstatus==8)  
+ 	{
+ 		m_DB_outbound_label="B";
+ 	}
+	else if(nextstatus==4)
+	{
+		 m_DB_outbound_label="C";
+	}
+
 		
 }
 void FSsession::collection(string name,string Text,int node)
@@ -1050,14 +1031,14 @@ int FScall::LauchFScall()
 			NumCancall=m_taskinfo.robotenum-m_SessionSet.size();
 		}
 		//originate_time
-		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=%d,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/88%s &park()",m_taskinfo.originate_timeout,m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),(ite->phonenum).c_str());
+		sprintf(callCmd,"bgapi originate {ignore_early_media=true,originate_timeout=%d,speechCraftID=%s,taskID=%s,taskname=%s,username=%s}sofia/gateway/ingw/%s%s &park()",m_taskinfo.originate_timeout,m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(ite->username).c_str(),FSprocess::m_prefixnum.c_str(),(ite->phonenum).c_str());
 		//sprintf(callCmd,"bgapi originate {speechCraftID=%s,taskID=%s,taskname=%s}user/%s &park()",m_speechcraftID.c_str(),m_taskID.c_str(),m_taskName.c_str(),(*ite).c_str());
 		esl_send_recv(&handle,callCmd);
 		esl_log(ESL_LOG_INFO,"callCmd:%s,FSprocess::m_SessionSet.size()=%d\n",callCmd,m_SessionSet.size()); 
 		--NumCancall;
 		maxCallout++;
 		esl_log(ESL_LOG_INFO,"NumCancall:%d\n",NumCancall);
-		//ite++;
+		ite++;
 		m_pPauseIte=ite;
 	}
     if (handle.last_sr_event && handle.last_sr_event->body)
@@ -1231,7 +1212,11 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 				FSsession*psession=ite->second;
 				char asrparam[256]={0};
 #ifdef _Use_ALI_SDK
-				sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
+				//sprintf(asrparam,"LTAIq8nguveEsyhV BlRVE9ZgUFiajaeiZEr3eeUiMuyUNE %s E2lTCNTExMJKdvvu",(psession->strUUID).c_str());
+				t_aliConfigxml& tconfig = FSprocess::Getavaliable(strUUID);
+				//id secret uuid appkey
+				cout<<"start_asr:"<<tconfig.User<<endl;
+				sprintf(asrparam,"%s %s %s %s",tconfig.AccessKeyId.c_str(),tconfig.AccessKeySecret.c_str(),(psession->strUUID).c_str(),tconfig.appkey.c_str());
 #else
 				sprintf(asrparam,"LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0 %s",(psession->strUUID).c_str());
 #endif
@@ -1272,6 +1257,7 @@ void FScall::CallEvent_handle(esl_handle_t *handle,
 					}
 					//m_sessionlock.lock();
 					esl_execute(handle, "stop_asr", "LTAIRLpr2pJFjQbY oxrJhiBZB5zLX7LKYqETC8PC8ulwh0", (psession->strUUID).c_str());
+					FSprocess::SetfreeRES(psession->strUUID);
 					//m_sessionlock.unlock();
 					psession->m_DB_creatd_at=psession->GetUTCtimestamp();
 					psession->InsertSessionResult();
@@ -1545,7 +1531,10 @@ vector<base_knowledge_t>FSprocess::m_knowledgeSet;
 string FSprocess::m_recordPath="/home/path";
 int FSprocess::m_userSetsilenseTime;
 int FSprocess::m_robotNum=10;
+map<string,t_aliConfigxml> FSprocess::m_aliconfigmap;
+map<string,string> FSprocess::m_uuid_aliconfig;
 esl_handle_t *FSprocess::m_timeouthandle=NULL;
+string FSprocess::m_prefixnum="88";
 void FSprocess::Initability()
 {
 	IniFile IniService;
@@ -1586,10 +1575,64 @@ void FSprocess::Initability()
 	{
 		m_robotNum=10;
 	}
+	iret=-1;
+	m_prefixnum=IniService.getStringValue("FREESWITCH","PREFIX_NUM",iret);
+	if(iret!=0)
+	{
+		m_prefixnum="88";
+	}
+
+}
+void FSprocess::LoadaliSDKonfig(string strpath)
+{
+	pugi::xml_document doc;
+	if(!doc.load_file("alisdk.xml",parse_full, encoding_utf8))
+		return  ;
+	pugi::xml_node tools = doc.child("Profile").child("asrTools");
+	for(pugi::xml_node count = tools.first_child();count;count=count.next_sibling())
+	{
+		t_aliConfigxml config;
+		config.appkey= count.attribute("appkey").as_string();
+		if(config.appkey!="")
+		{
+			 config.User = count.attribute("User").as_string();
+			 config.AccessKeyId = count.attribute("AccessKeyId").as_string();
+			 config.AccessKeySecret = count.attribute("AccessKeySecret").as_string();
+			 m_aliconfigmap[config.appkey]=config;
+		}
+
+	}
+}
+t_aliConfigxml& FSprocess::Getavaliable(string uuid)
+{
+	 map<string,t_aliConfigxml>::iterator ite=m_aliconfigmap.begin();
+	 while(ite!=m_aliconfigmap.end())
+	 {
+		 if(ite->second.index/*.get()*/<ite->second.MaxIndex)
+		 {
+			 m_uuid_aliconfig[uuid]=ite->second.appkey;
+			 ite->second.index++/*.inc()*/;
+			 return ite->second;
+		 }
+		 ite++;
+	 }
+	 return (m_aliconfigmap.begin()->second);
+}
+void FSprocess::SetfreeRES(string uuid)
+{
+	if(m_uuid_aliconfig.find(uuid)!=m_uuid_aliconfig.end())
+	{
+		if(m_aliconfigmap.find(m_uuid_aliconfig[uuid])!=m_aliconfigmap.end())
+		{
+			m_aliconfigmap[m_uuid_aliconfig[uuid]].index--/*.dec()*/;
+			m_uuid_aliconfig.erase(uuid);
+		}
+	}
 }
 void FSprocess::startProcess()
 {
 	Initability();
+	LoadaliSDKonfig("");
 	start();
 
 }
